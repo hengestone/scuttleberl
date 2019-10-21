@@ -5,6 +5,10 @@ deps
 *.plt
 erl_crash.dump
 ebin/*.beam
-rel/example_project
-.concrete/DEV_MODE
+rel/*
 .rebar
+rebar.lock
+_build/*
+log/*
+
+Mnesia*
