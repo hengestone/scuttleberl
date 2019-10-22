@@ -1,0 +1,39 @@
+syntax = "proto3";
+package ssb;
+
+enum keytype {
+  ed25519                = 1;
+  ed448                  = 2;
+}
+
+enum msgtype {
+  pub                    = 1;
+  invite                 = 2;
+}
+
+message identity {
+  keytype     tpe        = 1;
+  bytes       secret_key = 2; // optional
+  bytes       public_key = 3;
+  bytes       text       = 4; // human-readable identity
+}
+
+message address {
+  bytes       host       = 1;
+  int32       port       = 2;
+  identity    key        = 3;
+}
+
+message content {
+  msgtype     tpe         = 1;
+  address     address     = 2;
+}
+
+message msg {
+  identity    author     = 1;
+  content     content    = 2;
+}
+
+message invite {
+  identity    keys       = 1;
+}
