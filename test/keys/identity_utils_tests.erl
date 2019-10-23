@@ -13,18 +13,11 @@
 %% You should have received a copy of the GNU Affero General Public License
 %% along with this program.  If not, see <http://www.gnu.org/licenses/>.%%
 
--module(identity_utils).
+-module(identity_utils_tests).
+-include_lib("eunit/include/eunit.hrl").
 -include("ssb.hrl").
 
--export([create_identity/1]).
+-export([create_identity_test/0]).
 
--spec create_identity(atom()) -> #ssb_identity{}.
-create_identity(Type = ed25519) ->
-    #{ public := PublicKey, secret := PrivKeyOut } = enacl:crypto_sign_ed25519_keypair(),
-
-    #ssb_identity{
-       tpe = Type,
-       secret_key = PrivKeyOut,
-       public_key = PublicKey,
-       text       = binary:list_to_bin(io_lib:format("@~s.~s",[base64:encode(PublicKey), Type]))
-      }.
+create_identity_test() ->
+    #ssb_identity{} = identity_utils:create_identity(ed25519).
