@@ -16,8 +16,9 @@
 -export([find_msg_def/1, fetch_msg_def/1]).
 -export([find_enum_def/1, fetch_enum_def/1]).
 -export([enum_symbol_by_value/2, enum_value_by_symbol/2]).
--export([enum_symbol_by_value_keytype/1, enum_value_by_symbol_keytype/1]).
--export([enum_symbol_by_value_msgtype/1, enum_value_by_symbol_msgtype/1]).
+-export([enum_symbol_by_value_ssb_keytype/1, enum_value_by_symbol_ssb_keytype/1]).
+-export([enum_symbol_by_value_ssb_hashtype/1, enum_value_by_symbol_ssb_hashtype/1]).
+-export([enum_symbol_by_value_ssb_msgtype/1, enum_value_by_symbol_ssb_msgtype/1]).
 -export([get_service_names/0]).
 -export([get_service_def/1]).
 -export([get_rpc_names/1]).
@@ -50,35 +51,34 @@
 -include_lib("gpb/include/gpb.hrl").
 
 %% enumerated types
--type 'keytype'() :: 'ed25519' | 'ed448'.
--type 'msgtype'() :: 'pub' | 'invite'.
--export_type(['keytype'/0, 'msgtype'/0]).
+-type 'ssb_keytype'() :: 'ed25519' | 'ed448'.
+-type 'ssb_hashtype'() :: 'sha256' | 'blake2b'.
+-type 'ssb_msgtype'() :: 'pub' | 'invite'.
+-export_type(['ssb_keytype'/0, 'ssb_hashtype'/0, 'ssb_msgtype'/0]).
 
 %% message types
--type identity() :: #identity{}.
+-type ssb_identity() :: #ssb_identity{}.
 
--type address() :: #address{}.
+-type ssb_address() :: #ssb_address{}.
 
--type content() :: #content{}.
+-type ssb_content() :: #ssb_content{}.
 
--type msg() :: #msg{}.
+-type ssb_msg() :: #ssb_msg{}.
 
--type invite() :: #invite{}.
+-export_type(['ssb_identity'/0, 'ssb_address'/0, 'ssb_content'/0, 'ssb_msg'/0]).
 
--export_type(['identity'/0, 'address'/0, 'content'/0, 'msg'/0, 'invite'/0]).
-
--spec encode_msg(#identity{} | #address{} | #content{} | #msg{} | #invite{}) -> binary().
+-spec encode_msg(#ssb_identity{} | #ssb_address{} | #ssb_content{} | #ssb_msg{}) -> binary().
 encode_msg(Msg) when tuple_size(Msg) >= 1 ->
     encode_msg(Msg, element(1, Msg), []).
 
--spec encode_msg(#identity{} | #address{} | #content{} | #msg{} | #invite{}, atom() | list()) -> binary().
+-spec encode_msg(#ssb_identity{} | #ssb_address{} | #ssb_content{} | #ssb_msg{}, atom() | list()) -> binary().
 encode_msg(Msg, MsgName) when is_atom(MsgName) ->
     encode_msg(Msg, MsgName, []);
 encode_msg(Msg, Opts)
     when tuple_size(Msg) >= 1, is_list(Opts) ->
     encode_msg(Msg, element(1, Msg), Opts).
 
--spec encode_msg(#identity{} | #address{} | #content{} | #msg{} | #invite{}, atom(), list()) -> binary().
+-spec encode_msg(#ssb_identity{} | #ssb_address{} | #ssb_content{} | #ssb_msg{}, atom(), list()) -> binary().
 encode_msg(Msg, MsgName, Opts) ->
     case proplists:get_bool(verify, Opts) of
       true -> verify_msg(Msg, MsgName, Opts);
@@ -86,33 +86,34 @@ encode_msg(Msg, MsgName, Opts) ->
     end,
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
-      identity ->
-	  encode_msg_identity(id(Msg, TrUserData), TrUserData);
-      address ->
-	  encode_msg_address(id(Msg, TrUserData), TrUserData);
-      content ->
-	  encode_msg_content(id(Msg, TrUserData), TrUserData);
-      msg -> encode_msg_msg(id(Msg, TrUserData), TrUserData);
-      invite ->
-	  encode_msg_invite(id(Msg, TrUserData), TrUserData)
+      ssb_identity ->
+	  encode_msg_ssb_identity(id(Msg, TrUserData),
+				  TrUserData);
+      ssb_address ->
+	  encode_msg_ssb_address(id(Msg, TrUserData), TrUserData);
+      ssb_content ->
+	  encode_msg_ssb_content(id(Msg, TrUserData), TrUserData);
+      ssb_msg ->
+	  encode_msg_ssb_msg(id(Msg, TrUserData), TrUserData)
     end.
 
 
-encode_msg_identity(Msg, TrUserData) ->
-    encode_msg_identity(Msg, <<>>, TrUserData).
+encode_msg_ssb_identity(Msg, TrUserData) ->
+    encode_msg_ssb_identity(Msg, <<>>, TrUserData).
 
 
-encode_msg_identity(#identity{tpe = F1, secret_key = F2,
-			      public_key = F3, text = F4},
-		    Bin, TrUserData) ->
+encode_msg_ssb_identity(#ssb_identity{tpe = F1,
+				      secret_key = F2, public_key = F3,
+				      text = F4},
+			Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
 	    true ->
 		begin
 		  TrF1 = id(F1, TrUserData),
 		  if TrF1 =:= ed25519; TrF1 =:= 0 -> Bin;
 		     true ->
-			 e_enum_keytype(TrF1, <<Bin/binary, 8>>,
-					'MaybeTrUserData')
+			 e_enum_ssb_keytype(TrF1, <<Bin/binary, 8>>,
+					    'MaybeTrUserData')
 		  end
 		end
 	 end,
@@ -147,13 +148,13 @@ encode_msg_identity(#identity{tpe = F1, secret_key = F2,
 	   end
     end.
 
-encode_msg_address(Msg, TrUserData) ->
-    encode_msg_address(Msg, <<>>, TrUserData).
+encode_msg_ssb_address(Msg, TrUserData) ->
+    encode_msg_ssb_address(Msg, <<>>, TrUserData).
 
 
-encode_msg_address(#address{host = F1, port = F2,
-			    key = F3},
-		   Bin, TrUserData) ->
+encode_msg_ssb_address(#ssb_address{host = F1,
+				    port = F2, key = F3},
+		       Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
 	    true ->
 		begin
@@ -180,26 +181,27 @@ encode_msg_address(#address{host = F1, port = F2,
 	     TrF3 = id(F3, TrUserData),
 	     if TrF3 =:= undefined -> B2;
 		true ->
-		    e_mfield_address_key(TrF3, <<B2/binary, 26>>,
-					 TrUserData)
+		    e_mfield_ssb_address_key(TrF3, <<B2/binary, 26>>,
+					     TrUserData)
 	     end
 	   end
     end.
 
-encode_msg_content(Msg, TrUserData) ->
-    encode_msg_content(Msg, <<>>, TrUserData).
+encode_msg_ssb_content(Msg, TrUserData) ->
+    encode_msg_ssb_content(Msg, <<>>, TrUserData).
 
 
-encode_msg_content(#content{tpe = F1, address = F2},
-		   Bin, TrUserData) ->
+encode_msg_ssb_content(#ssb_content{tpe = F1,
+				    address = F2},
+		       Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
 	    true ->
 		begin
 		  TrF1 = id(F1, TrUserData),
 		  if TrF1 =:= pub; TrF1 =:= 0 -> Bin;
 		     true ->
-			 e_enum_msgtype(TrF1, <<Bin/binary, 8>>,
-					'MaybeTrUserData')
+			 e_enum_ssb_msgtype(TrF1, <<Bin/binary, 8>>,
+					    'MaybeTrUserData')
 		  end
 		end
 	 end,
@@ -209,26 +211,26 @@ encode_msg_content(#content{tpe = F1, address = F2},
 	     TrF2 = id(F2, TrUserData),
 	     if TrF2 =:= undefined -> B1;
 		true ->
-		    e_mfield_content_address(TrF2, <<B1/binary, 18>>,
-					     TrUserData)
+		    e_mfield_ssb_content_address(TrF2, <<B1/binary, 18>>,
+						 TrUserData)
 	     end
 	   end
     end.
 
-encode_msg_msg(Msg, TrUserData) ->
-    encode_msg_msg(Msg, <<>>, TrUserData).
+encode_msg_ssb_msg(Msg, TrUserData) ->
+    encode_msg_ssb_msg(Msg, <<>>, TrUserData).
 
 
-encode_msg_msg(#msg{author = F1, content = F2}, Bin,
-	       TrUserData) ->
+encode_msg_ssb_msg(#ssb_msg{author = F1, content = F2},
+		   Bin, TrUserData) ->
     B1 = if F1 == undefined -> Bin;
 	    true ->
 		begin
 		  TrF1 = id(F1, TrUserData),
 		  if TrF1 =:= undefined -> Bin;
 		     true ->
-			 e_mfield_msg_author(TrF1, <<Bin/binary, 10>>,
-					     TrUserData)
+			 e_mfield_ssb_msg_author(TrF1, <<Bin/binary, 10>>,
+						 TrUserData)
 		  end
 		end
 	 end,
@@ -238,66 +240,45 @@ encode_msg_msg(#msg{author = F1, content = F2}, Bin,
 	     TrF2 = id(F2, TrUserData),
 	     if TrF2 =:= undefined -> B1;
 		true ->
-		    e_mfield_msg_content(TrF2, <<B1/binary, 18>>,
-					 TrUserData)
+		    e_mfield_ssb_msg_content(TrF2, <<B1/binary, 18>>,
+					     TrUserData)
 	     end
 	   end
     end.
 
-encode_msg_invite(Msg, TrUserData) ->
-    encode_msg_invite(Msg, <<>>, TrUserData).
-
-
-encode_msg_invite(#invite{keys = F1}, Bin,
-		  TrUserData) ->
-    if F1 == undefined -> Bin;
-       true ->
-	   begin
-	     TrF1 = id(F1, TrUserData),
-	     if TrF1 =:= undefined -> Bin;
-		true ->
-		    e_mfield_invite_keys(TrF1, <<Bin/binary, 10>>,
-					 TrUserData)
-	     end
-	   end
-    end.
-
-e_mfield_address_key(Msg, Bin, TrUserData) ->
-    SubBin = encode_msg_identity(Msg, <<>>, TrUserData),
+e_mfield_ssb_address_key(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_ssb_identity(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
-e_mfield_content_address(Msg, Bin, TrUserData) ->
-    SubBin = encode_msg_address(Msg, <<>>, TrUserData),
+e_mfield_ssb_content_address(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_ssb_address(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
-e_mfield_msg_author(Msg, Bin, TrUserData) ->
-    SubBin = encode_msg_identity(Msg, <<>>, TrUserData),
+e_mfield_ssb_msg_author(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_ssb_identity(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
-e_mfield_msg_content(Msg, Bin, TrUserData) ->
-    SubBin = encode_msg_content(Msg, <<>>, TrUserData),
+e_mfield_ssb_msg_content(Msg, Bin, TrUserData) ->
+    SubBin = encode_msg_ssb_content(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
-e_mfield_invite_keys(Msg, Bin, TrUserData) ->
-    SubBin = encode_msg_identity(Msg, <<>>, TrUserData),
-    Bin2 = e_varint(byte_size(SubBin), Bin),
-    <<Bin2/binary, SubBin/binary>>.
-
-e_enum_keytype(ed25519, Bin, _TrUserData) ->
+e_enum_ssb_keytype(ed25519, Bin, _TrUserData) ->
     <<Bin/binary, 1>>;
-e_enum_keytype(ed448, Bin, _TrUserData) ->
+e_enum_ssb_keytype(ed448, Bin, _TrUserData) ->
     <<Bin/binary, 2>>;
-e_enum_keytype(V, Bin, _TrUserData) -> e_varint(V, Bin).
+e_enum_ssb_keytype(V, Bin, _TrUserData) ->
+    e_varint(V, Bin).
 
-e_enum_msgtype(pub, Bin, _TrUserData) ->
+e_enum_ssb_msgtype(pub, Bin, _TrUserData) ->
     <<Bin/binary, 1>>;
-e_enum_msgtype(invite, Bin, _TrUserData) ->
+e_enum_ssb_msgtype(invite, Bin, _TrUserData) ->
     <<Bin/binary, 2>>;
-e_enum_msgtype(V, Bin, _TrUserData) -> e_varint(V, Bin).
+e_enum_ssb_msgtype(V, Bin, _TrUserData) ->
+    e_varint(V, Bin).
 
 -compile({nowarn_unused_function,e_type_sint/3}).
 e_type_sint(Value, Bin, _TrUserData) when Value >= 0 ->
@@ -413,713 +394,645 @@ decode_msg_1_catch(Bin, MsgName, TrUserData) ->
     end.
 -endif.
 
-decode_msg_2_doit(identity, Bin, TrUserData) ->
-    id(decode_msg_identity(Bin, TrUserData), TrUserData);
-decode_msg_2_doit(address, Bin, TrUserData) ->
-    id(decode_msg_address(Bin, TrUserData), TrUserData);
-decode_msg_2_doit(content, Bin, TrUserData) ->
-    id(decode_msg_content(Bin, TrUserData), TrUserData);
-decode_msg_2_doit(msg, Bin, TrUserData) ->
-    id(decode_msg_msg(Bin, TrUserData), TrUserData);
-decode_msg_2_doit(invite, Bin, TrUserData) ->
-    id(decode_msg_invite(Bin, TrUserData), TrUserData).
+decode_msg_2_doit(ssb_identity, Bin, TrUserData) ->
+    id(decode_msg_ssb_identity(Bin, TrUserData),
+       TrUserData);
+decode_msg_2_doit(ssb_address, Bin, TrUserData) ->
+    id(decode_msg_ssb_address(Bin, TrUserData), TrUserData);
+decode_msg_2_doit(ssb_content, Bin, TrUserData) ->
+    id(decode_msg_ssb_content(Bin, TrUserData), TrUserData);
+decode_msg_2_doit(ssb_msg, Bin, TrUserData) ->
+    id(decode_msg_ssb_msg(Bin, TrUserData), TrUserData).
 
 
 
-decode_msg_identity(Bin, TrUserData) ->
-    dfp_read_field_def_identity(Bin, 0, 0,
-				id(ed25519, TrUserData), id(<<>>, TrUserData),
-				id(<<>>, TrUserData), id(<<>>, TrUserData),
-				TrUserData).
+decode_msg_ssb_identity(Bin, TrUserData) ->
+    dfp_read_field_def_ssb_identity(Bin, 0, 0,
+				    id(ed25519, TrUserData),
+				    id(<<>>, TrUserData), id(<<>>, TrUserData),
+				    id(<<>>, TrUserData), TrUserData).
 
-dfp_read_field_def_identity(<<8, Rest/binary>>, Z1, Z2,
-			    F@_1, F@_2, F@_3, F@_4, TrUserData) ->
-    d_field_identity_tpe(Rest, Z1, Z2, F@_1, F@_2, F@_3,
-			 F@_4, TrUserData);
-dfp_read_field_def_identity(<<18, Rest/binary>>, Z1, Z2,
-			    F@_1, F@_2, F@_3, F@_4, TrUserData) ->
-    d_field_identity_secret_key(Rest, Z1, Z2, F@_1, F@_2,
-				F@_3, F@_4, TrUserData);
-dfp_read_field_def_identity(<<26, Rest/binary>>, Z1, Z2,
-			    F@_1, F@_2, F@_3, F@_4, TrUserData) ->
-    d_field_identity_public_key(Rest, Z1, Z2, F@_1, F@_2,
-				F@_3, F@_4, TrUserData);
-dfp_read_field_def_identity(<<34, Rest/binary>>, Z1, Z2,
-			    F@_1, F@_2, F@_3, F@_4, TrUserData) ->
-    d_field_identity_text(Rest, Z1, Z2, F@_1, F@_2, F@_3,
-			  F@_4, TrUserData);
-dfp_read_field_def_identity(<<>>, 0, 0, F@_1, F@_2,
-			    F@_3, F@_4, _) ->
-    #identity{tpe = F@_1, secret_key = F@_2,
-	      public_key = F@_3, text = F@_4};
-dfp_read_field_def_identity(Other, Z1, Z2, F@_1, F@_2,
-			    F@_3, F@_4, TrUserData) ->
-    dg_read_field_def_identity(Other, Z1, Z2, F@_1, F@_2,
-			       F@_3, F@_4, TrUserData).
+dfp_read_field_def_ssb_identity(<<8, Rest/binary>>, Z1,
+				Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_ssb_identity_tpe(Rest, Z1, Z2, F@_1, F@_2, F@_3,
+			     F@_4, TrUserData);
+dfp_read_field_def_ssb_identity(<<18, Rest/binary>>, Z1,
+				Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_ssb_identity_secret_key(Rest, Z1, Z2, F@_1,
+				    F@_2, F@_3, F@_4, TrUserData);
+dfp_read_field_def_ssb_identity(<<26, Rest/binary>>, Z1,
+				Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_ssb_identity_public_key(Rest, Z1, Z2, F@_1,
+				    F@_2, F@_3, F@_4, TrUserData);
+dfp_read_field_def_ssb_identity(<<34, Rest/binary>>, Z1,
+				Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_ssb_identity_text(Rest, Z1, Z2, F@_1, F@_2,
+			      F@_3, F@_4, TrUserData);
+dfp_read_field_def_ssb_identity(<<>>, 0, 0, F@_1, F@_2,
+				F@_3, F@_4, _) ->
+    #ssb_identity{tpe = F@_1, secret_key = F@_2,
+		  public_key = F@_3, text = F@_4};
+dfp_read_field_def_ssb_identity(Other, Z1, Z2, F@_1,
+				F@_2, F@_3, F@_4, TrUserData) ->
+    dg_read_field_def_ssb_identity(Other, Z1, Z2, F@_1,
+				   F@_2, F@_3, F@_4, TrUserData).
 
-dg_read_field_def_identity(<<1:1, X:7, Rest/binary>>, N,
-			   Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
+dg_read_field_def_ssb_identity(<<1:1, X:7,
+				 Rest/binary>>,
+			       N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 32 - 7 ->
-    dg_read_field_def_identity(Rest, N + 7, X bsl N + Acc,
-			       F@_1, F@_2, F@_3, F@_4, TrUserData);
-dg_read_field_def_identity(<<0:1, X:7, Rest/binary>>, N,
-			   Acc, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    dg_read_field_def_ssb_identity(Rest, N + 7,
+				   X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+				   TrUserData);
+dg_read_field_def_ssb_identity(<<0:1, X:7,
+				 Rest/binary>>,
+			       N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
       8 ->
-	  d_field_identity_tpe(Rest, 0, 0, F@_1, F@_2, F@_3, F@_4,
-			       TrUserData);
+	  d_field_ssb_identity_tpe(Rest, 0, 0, F@_1, F@_2, F@_3,
+				   F@_4, TrUserData);
       18 ->
-	  d_field_identity_secret_key(Rest, 0, 0, F@_1, F@_2,
-				      F@_3, F@_4, TrUserData);
+	  d_field_ssb_identity_secret_key(Rest, 0, 0, F@_1, F@_2,
+					  F@_3, F@_4, TrUserData);
       26 ->
-	  d_field_identity_public_key(Rest, 0, 0, F@_1, F@_2,
-				      F@_3, F@_4, TrUserData);
+	  d_field_ssb_identity_public_key(Rest, 0, 0, F@_1, F@_2,
+					  F@_3, F@_4, TrUserData);
       34 ->
-	  d_field_identity_text(Rest, 0, 0, F@_1, F@_2, F@_3,
-				F@_4, TrUserData);
+	  d_field_ssb_identity_text(Rest, 0, 0, F@_1, F@_2, F@_3,
+				    F@_4, TrUserData);
       _ ->
 	  case Key band 7 of
 	    0 ->
-		skip_varint_identity(Rest, 0, 0, F@_1, F@_2, F@_3, F@_4,
-				     TrUserData);
+		skip_varint_ssb_identity(Rest, 0, 0, F@_1, F@_2, F@_3,
+					 F@_4, TrUserData);
 	    1 ->
-		skip_64_identity(Rest, 0, 0, F@_1, F@_2, F@_3, F@_4,
-				 TrUserData);
+		skip_64_ssb_identity(Rest, 0, 0, F@_1, F@_2, F@_3, F@_4,
+				     TrUserData);
 	    2 ->
-		skip_length_delimited_identity(Rest, 0, 0, F@_1, F@_2,
-					       F@_3, F@_4, TrUserData);
+		skip_length_delimited_ssb_identity(Rest, 0, 0, F@_1,
+						   F@_2, F@_3, F@_4,
+						   TrUserData);
 	    3 ->
-		skip_group_identity(Rest, Key bsr 3, 0, F@_1, F@_2,
-				    F@_3, F@_4, TrUserData);
+		skip_group_ssb_identity(Rest, Key bsr 3, 0, F@_1, F@_2,
+					F@_3, F@_4, TrUserData);
 	    5 ->
-		skip_32_identity(Rest, 0, 0, F@_1, F@_2, F@_3, F@_4,
-				 TrUserData)
+		skip_32_ssb_identity(Rest, 0, 0, F@_1, F@_2, F@_3, F@_4,
+				     TrUserData)
 	  end
     end;
-dg_read_field_def_identity(<<>>, 0, 0, F@_1, F@_2, F@_3,
-			   F@_4, _) ->
-    #identity{tpe = F@_1, secret_key = F@_2,
-	      public_key = F@_3, text = F@_4}.
+dg_read_field_def_ssb_identity(<<>>, 0, 0, F@_1, F@_2,
+			       F@_3, F@_4, _) ->
+    #ssb_identity{tpe = F@_1, secret_key = F@_2,
+		  public_key = F@_3, text = F@_4}.
 
-d_field_identity_tpe(<<1:1, X:7, Rest/binary>>, N, Acc,
-		     F@_1, F@_2, F@_3, F@_4, TrUserData)
+d_field_ssb_identity_tpe(<<1:1, X:7, Rest/binary>>, N,
+			 Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 57 ->
-    d_field_identity_tpe(Rest, N + 7, X bsl N + Acc, F@_1,
-			 F@_2, F@_3, F@_4, TrUserData);
-d_field_identity_tpe(<<0:1, X:7, Rest/binary>>, N, Acc,
-		     _, F@_2, F@_3, F@_4, TrUserData) ->
-    {NewFValue, RestF} = {id(d_enum_keytype(begin
-					      <<Res:32/signed-native>> = <<(X
-									      bsl
-									      N
-									      +
-									      Acc):32/unsigned-native>>,
-					      id(Res, TrUserData)
-					    end),
+    d_field_ssb_identity_tpe(Rest, N + 7, X bsl N + Acc,
+			     F@_1, F@_2, F@_3, F@_4, TrUserData);
+d_field_ssb_identity_tpe(<<0:1, X:7, Rest/binary>>, N,
+			 Acc, _, F@_2, F@_3, F@_4, TrUserData) ->
+    {NewFValue, RestF} = {id(d_enum_ssb_keytype(begin
+						  <<Res:32/signed-native>> =
+						      <<(X bsl N +
+							   Acc):32/unsigned-native>>,
+						  id(Res, TrUserData)
+						end),
 			     TrUserData),
 			  Rest},
-    dfp_read_field_def_identity(RestF, 0, 0, NewFValue,
-				F@_2, F@_3, F@_4, TrUserData).
+    dfp_read_field_def_ssb_identity(RestF, 0, 0, NewFValue,
+				    F@_2, F@_3, F@_4, TrUserData).
 
-d_field_identity_secret_key(<<1:1, X:7, Rest/binary>>,
-			    N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
+d_field_ssb_identity_secret_key(<<1:1, X:7,
+				  Rest/binary>>,
+				N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 57 ->
-    d_field_identity_secret_key(Rest, N + 7, X bsl N + Acc,
-				F@_1, F@_2, F@_3, F@_4, TrUserData);
-d_field_identity_secret_key(<<0:1, X:7, Rest/binary>>,
-			    N, Acc, F@_1, _, F@_3, F@_4, TrUserData) ->
+    d_field_ssb_identity_secret_key(Rest, N + 7,
+				    X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+				    TrUserData);
+d_field_ssb_identity_secret_key(<<0:1, X:7,
+				  Rest/binary>>,
+				N, Acc, F@_1, _, F@_3, F@_4, TrUserData) ->
     {NewFValue, RestF} = begin
 			   Len = X bsl N + Acc,
 			   <<Bytes:Len/binary, Rest2/binary>> = Rest,
 			   {id(binary:copy(Bytes), TrUserData), Rest2}
 			 end,
-    dfp_read_field_def_identity(RestF, 0, 0, F@_1,
-				NewFValue, F@_3, F@_4, TrUserData).
+    dfp_read_field_def_ssb_identity(RestF, 0, 0, F@_1,
+				    NewFValue, F@_3, F@_4, TrUserData).
 
-d_field_identity_public_key(<<1:1, X:7, Rest/binary>>,
-			    N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
+d_field_ssb_identity_public_key(<<1:1, X:7,
+				  Rest/binary>>,
+				N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 57 ->
-    d_field_identity_public_key(Rest, N + 7, X bsl N + Acc,
-				F@_1, F@_2, F@_3, F@_4, TrUserData);
-d_field_identity_public_key(<<0:1, X:7, Rest/binary>>,
-			    N, Acc, F@_1, F@_2, _, F@_4, TrUserData) ->
+    d_field_ssb_identity_public_key(Rest, N + 7,
+				    X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+				    TrUserData);
+d_field_ssb_identity_public_key(<<0:1, X:7,
+				  Rest/binary>>,
+				N, Acc, F@_1, F@_2, _, F@_4, TrUserData) ->
     {NewFValue, RestF} = begin
 			   Len = X bsl N + Acc,
 			   <<Bytes:Len/binary, Rest2/binary>> = Rest,
 			   {id(binary:copy(Bytes), TrUserData), Rest2}
 			 end,
-    dfp_read_field_def_identity(RestF, 0, 0, F@_1, F@_2,
-				NewFValue, F@_4, TrUserData).
+    dfp_read_field_def_ssb_identity(RestF, 0, 0, F@_1, F@_2,
+				    NewFValue, F@_4, TrUserData).
 
-d_field_identity_text(<<1:1, X:7, Rest/binary>>, N, Acc,
-		      F@_1, F@_2, F@_3, F@_4, TrUserData)
+d_field_ssb_identity_text(<<1:1, X:7, Rest/binary>>, N,
+			  Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 57 ->
-    d_field_identity_text(Rest, N + 7, X bsl N + Acc, F@_1,
-			  F@_2, F@_3, F@_4, TrUserData);
-d_field_identity_text(<<0:1, X:7, Rest/binary>>, N, Acc,
-		      F@_1, F@_2, F@_3, _, TrUserData) ->
+    d_field_ssb_identity_text(Rest, N + 7, X bsl N + Acc,
+			      F@_1, F@_2, F@_3, F@_4, TrUserData);
+d_field_ssb_identity_text(<<0:1, X:7, Rest/binary>>, N,
+			  Acc, F@_1, F@_2, F@_3, _, TrUserData) ->
     {NewFValue, RestF} = begin
 			   Len = X bsl N + Acc,
 			   <<Bytes:Len/binary, Rest2/binary>> = Rest,
 			   {id(binary:copy(Bytes), TrUserData), Rest2}
 			 end,
-    dfp_read_field_def_identity(RestF, 0, 0, F@_1, F@_2,
-				F@_3, NewFValue, TrUserData).
+    dfp_read_field_def_ssb_identity(RestF, 0, 0, F@_1, F@_2,
+				    F@_3, NewFValue, TrUserData).
 
-skip_varint_identity(<<1:1, _:7, Rest/binary>>, Z1, Z2,
-		     F@_1, F@_2, F@_3, F@_4, TrUserData) ->
-    skip_varint_identity(Rest, Z1, Z2, F@_1, F@_2, F@_3,
-			 F@_4, TrUserData);
-skip_varint_identity(<<0:1, _:7, Rest/binary>>, Z1, Z2,
-		     F@_1, F@_2, F@_3, F@_4, TrUserData) ->
-    dfp_read_field_def_identity(Rest, Z1, Z2, F@_1, F@_2,
-				F@_3, F@_4, TrUserData).
+skip_varint_ssb_identity(<<1:1, _:7, Rest/binary>>, Z1,
+			 Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    skip_varint_ssb_identity(Rest, Z1, Z2, F@_1, F@_2, F@_3,
+			     F@_4, TrUserData);
+skip_varint_ssb_identity(<<0:1, _:7, Rest/binary>>, Z1,
+			 Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    dfp_read_field_def_ssb_identity(Rest, Z1, Z2, F@_1,
+				    F@_2, F@_3, F@_4, TrUserData).
 
-skip_length_delimited_identity(<<1:1, X:7,
-				 Rest/binary>>,
-			       N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
+skip_length_delimited_ssb_identity(<<1:1, X:7,
+				     Rest/binary>>,
+				   N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 57 ->
-    skip_length_delimited_identity(Rest, N + 7,
-				   X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
-				   TrUserData);
-skip_length_delimited_identity(<<0:1, X:7,
-				 Rest/binary>>,
-			       N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    skip_length_delimited_ssb_identity(Rest, N + 7,
+				       X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+				       TrUserData);
+skip_length_delimited_ssb_identity(<<0:1, X:7,
+				     Rest/binary>>,
+				   N, Acc, F@_1, F@_2, F@_3, F@_4,
+				   TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_identity(Rest2, 0, 0, F@_1, F@_2,
-				F@_3, F@_4, TrUserData).
+    dfp_read_field_def_ssb_identity(Rest2, 0, 0, F@_1, F@_2,
+				    F@_3, F@_4, TrUserData).
 
-skip_group_identity(Bin, FNum, Z2, F@_1, F@_2, F@_3,
-		    F@_4, TrUserData) ->
+skip_group_ssb_identity(Bin, FNum, Z2, F@_1, F@_2, F@_3,
+			F@_4, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_identity(Rest, 0, Z2, F@_1, F@_2,
-				F@_3, F@_4, TrUserData).
+    dfp_read_field_def_ssb_identity(Rest, 0, Z2, F@_1, F@_2,
+				    F@_3, F@_4, TrUserData).
 
-skip_32_identity(<<_:32, Rest/binary>>, Z1, Z2, F@_1,
-		 F@_2, F@_3, F@_4, TrUserData) ->
-    dfp_read_field_def_identity(Rest, Z1, Z2, F@_1, F@_2,
-				F@_3, F@_4, TrUserData).
+skip_32_ssb_identity(<<_:32, Rest/binary>>, Z1, Z2,
+		     F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    dfp_read_field_def_ssb_identity(Rest, Z1, Z2, F@_1,
+				    F@_2, F@_3, F@_4, TrUserData).
 
-skip_64_identity(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
-		 F@_2, F@_3, F@_4, TrUserData) ->
-    dfp_read_field_def_identity(Rest, Z1, Z2, F@_1, F@_2,
-				F@_3, F@_4, TrUserData).
+skip_64_ssb_identity(<<_:64, Rest/binary>>, Z1, Z2,
+		     F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    dfp_read_field_def_ssb_identity(Rest, Z1, Z2, F@_1,
+				    F@_2, F@_3, F@_4, TrUserData).
 
-decode_msg_address(Bin, TrUserData) ->
-    dfp_read_field_def_address(Bin, 0, 0,
-			       id(<<>>, TrUserData), id(0, TrUserData),
-			       id(undefined, TrUserData), TrUserData).
+decode_msg_ssb_address(Bin, TrUserData) ->
+    dfp_read_field_def_ssb_address(Bin, 0, 0,
+				   id(<<>>, TrUserData), id(0, TrUserData),
+				   id(undefined, TrUserData), TrUserData).
 
-dfp_read_field_def_address(<<10, Rest/binary>>, Z1, Z2,
-			   F@_1, F@_2, F@_3, TrUserData) ->
-    d_field_address_host(Rest, Z1, Z2, F@_1, F@_2, F@_3,
-			 TrUserData);
-dfp_read_field_def_address(<<16, Rest/binary>>, Z1, Z2,
-			   F@_1, F@_2, F@_3, TrUserData) ->
-    d_field_address_port(Rest, Z1, Z2, F@_1, F@_2, F@_3,
-			 TrUserData);
-dfp_read_field_def_address(<<26, Rest/binary>>, Z1, Z2,
-			   F@_1, F@_2, F@_3, TrUserData) ->
-    d_field_address_key(Rest, Z1, Z2, F@_1, F@_2, F@_3,
-			TrUserData);
-dfp_read_field_def_address(<<>>, 0, 0, F@_1, F@_2, F@_3,
-			   _) ->
-    #address{host = F@_1, port = F@_2, key = F@_3};
-dfp_read_field_def_address(Other, Z1, Z2, F@_1, F@_2,
-			   F@_3, TrUserData) ->
-    dg_read_field_def_address(Other, Z1, Z2, F@_1, F@_2,
-			      F@_3, TrUserData).
+dfp_read_field_def_ssb_address(<<10, Rest/binary>>, Z1,
+			       Z2, F@_1, F@_2, F@_3, TrUserData) ->
+    d_field_ssb_address_host(Rest, Z1, Z2, F@_1, F@_2, F@_3,
+			     TrUserData);
+dfp_read_field_def_ssb_address(<<16, Rest/binary>>, Z1,
+			       Z2, F@_1, F@_2, F@_3, TrUserData) ->
+    d_field_ssb_address_port(Rest, Z1, Z2, F@_1, F@_2, F@_3,
+			     TrUserData);
+dfp_read_field_def_ssb_address(<<26, Rest/binary>>, Z1,
+			       Z2, F@_1, F@_2, F@_3, TrUserData) ->
+    d_field_ssb_address_key(Rest, Z1, Z2, F@_1, F@_2, F@_3,
+			    TrUserData);
+dfp_read_field_def_ssb_address(<<>>, 0, 0, F@_1, F@_2,
+			       F@_3, _) ->
+    #ssb_address{host = F@_1, port = F@_2, key = F@_3};
+dfp_read_field_def_ssb_address(Other, Z1, Z2, F@_1,
+			       F@_2, F@_3, TrUserData) ->
+    dg_read_field_def_ssb_address(Other, Z1, Z2, F@_1, F@_2,
+				  F@_3, TrUserData).
 
-dg_read_field_def_address(<<1:1, X:7, Rest/binary>>, N,
-			  Acc, F@_1, F@_2, F@_3, TrUserData)
+dg_read_field_def_ssb_address(<<1:1, X:7, Rest/binary>>,
+			      N, Acc, F@_1, F@_2, F@_3, TrUserData)
     when N < 32 - 7 ->
-    dg_read_field_def_address(Rest, N + 7, X bsl N + Acc,
-			      F@_1, F@_2, F@_3, TrUserData);
-dg_read_field_def_address(<<0:1, X:7, Rest/binary>>, N,
-			  Acc, F@_1, F@_2, F@_3, TrUserData) ->
+    dg_read_field_def_ssb_address(Rest, N + 7,
+				  X bsl N + Acc, F@_1, F@_2, F@_3, TrUserData);
+dg_read_field_def_ssb_address(<<0:1, X:7, Rest/binary>>,
+			      N, Acc, F@_1, F@_2, F@_3, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
       10 ->
-	  d_field_address_host(Rest, 0, 0, F@_1, F@_2, F@_3,
-			       TrUserData);
+	  d_field_ssb_address_host(Rest, 0, 0, F@_1, F@_2, F@_3,
+				   TrUserData);
       16 ->
-	  d_field_address_port(Rest, 0, 0, F@_1, F@_2, F@_3,
-			       TrUserData);
+	  d_field_ssb_address_port(Rest, 0, 0, F@_1, F@_2, F@_3,
+				   TrUserData);
       26 ->
-	  d_field_address_key(Rest, 0, 0, F@_1, F@_2, F@_3,
-			      TrUserData);
+	  d_field_ssb_address_key(Rest, 0, 0, F@_1, F@_2, F@_3,
+				  TrUserData);
       _ ->
 	  case Key band 7 of
 	    0 ->
-		skip_varint_address(Rest, 0, 0, F@_1, F@_2, F@_3,
-				    TrUserData);
+		skip_varint_ssb_address(Rest, 0, 0, F@_1, F@_2, F@_3,
+					TrUserData);
 	    1 ->
-		skip_64_address(Rest, 0, 0, F@_1, F@_2, F@_3,
-				TrUserData);
+		skip_64_ssb_address(Rest, 0, 0, F@_1, F@_2, F@_3,
+				    TrUserData);
 	    2 ->
-		skip_length_delimited_address(Rest, 0, 0, F@_1, F@_2,
-					      F@_3, TrUserData);
+		skip_length_delimited_ssb_address(Rest, 0, 0, F@_1,
+						  F@_2, F@_3, TrUserData);
 	    3 ->
-		skip_group_address(Rest, Key bsr 3, 0, F@_1, F@_2, F@_3,
-				   TrUserData);
+		skip_group_ssb_address(Rest, Key bsr 3, 0, F@_1, F@_2,
+				       F@_3, TrUserData);
 	    5 ->
-		skip_32_address(Rest, 0, 0, F@_1, F@_2, F@_3,
-				TrUserData)
+		skip_32_ssb_address(Rest, 0, 0, F@_1, F@_2, F@_3,
+				    TrUserData)
 	  end
     end;
-dg_read_field_def_address(<<>>, 0, 0, F@_1, F@_2, F@_3,
-			  _) ->
-    #address{host = F@_1, port = F@_2, key = F@_3}.
+dg_read_field_def_ssb_address(<<>>, 0, 0, F@_1, F@_2,
+			      F@_3, _) ->
+    #ssb_address{host = F@_1, port = F@_2, key = F@_3}.
 
-d_field_address_host(<<1:1, X:7, Rest/binary>>, N, Acc,
-		     F@_1, F@_2, F@_3, TrUserData)
+d_field_ssb_address_host(<<1:1, X:7, Rest/binary>>, N,
+			 Acc, F@_1, F@_2, F@_3, TrUserData)
     when N < 57 ->
-    d_field_address_host(Rest, N + 7, X bsl N + Acc, F@_1,
-			 F@_2, F@_3, TrUserData);
-d_field_address_host(<<0:1, X:7, Rest/binary>>, N, Acc,
-		     _, F@_2, F@_3, TrUserData) ->
+    d_field_ssb_address_host(Rest, N + 7, X bsl N + Acc,
+			     F@_1, F@_2, F@_3, TrUserData);
+d_field_ssb_address_host(<<0:1, X:7, Rest/binary>>, N,
+			 Acc, _, F@_2, F@_3, TrUserData) ->
     {NewFValue, RestF} = begin
 			   Len = X bsl N + Acc,
 			   <<Bytes:Len/binary, Rest2/binary>> = Rest,
 			   {id(binary:copy(Bytes), TrUserData), Rest2}
 			 end,
-    dfp_read_field_def_address(RestF, 0, 0, NewFValue, F@_2,
-			       F@_3, TrUserData).
+    dfp_read_field_def_ssb_address(RestF, 0, 0, NewFValue,
+				   F@_2, F@_3, TrUserData).
 
-d_field_address_port(<<1:1, X:7, Rest/binary>>, N, Acc,
-		     F@_1, F@_2, F@_3, TrUserData)
+d_field_ssb_address_port(<<1:1, X:7, Rest/binary>>, N,
+			 Acc, F@_1, F@_2, F@_3, TrUserData)
     when N < 57 ->
-    d_field_address_port(Rest, N + 7, X bsl N + Acc, F@_1,
-			 F@_2, F@_3, TrUserData);
-d_field_address_port(<<0:1, X:7, Rest/binary>>, N, Acc,
-		     F@_1, _, F@_3, TrUserData) ->
+    d_field_ssb_address_port(Rest, N + 7, X bsl N + Acc,
+			     F@_1, F@_2, F@_3, TrUserData);
+d_field_ssb_address_port(<<0:1, X:7, Rest/binary>>, N,
+			 Acc, F@_1, _, F@_3, TrUserData) ->
     {NewFValue, RestF} = {begin
 			    <<Res:32/signed-native>> = <<(X bsl N +
 							    Acc):32/unsigned-native>>,
 			    id(Res, TrUserData)
 			  end,
 			  Rest},
-    dfp_read_field_def_address(RestF, 0, 0, F@_1, NewFValue,
-			       F@_3, TrUserData).
+    dfp_read_field_def_ssb_address(RestF, 0, 0, F@_1,
+				   NewFValue, F@_3, TrUserData).
 
-d_field_address_key(<<1:1, X:7, Rest/binary>>, N, Acc,
-		    F@_1, F@_2, F@_3, TrUserData)
+d_field_ssb_address_key(<<1:1, X:7, Rest/binary>>, N,
+			Acc, F@_1, F@_2, F@_3, TrUserData)
     when N < 57 ->
-    d_field_address_key(Rest, N + 7, X bsl N + Acc, F@_1,
-			F@_2, F@_3, TrUserData);
-d_field_address_key(<<0:1, X:7, Rest/binary>>, N, Acc,
-		    F@_1, F@_2, Prev, TrUserData) ->
+    d_field_ssb_address_key(Rest, N + 7, X bsl N + Acc,
+			    F@_1, F@_2, F@_3, TrUserData);
+d_field_ssb_address_key(<<0:1, X:7, Rest/binary>>, N,
+			Acc, F@_1, F@_2, Prev, TrUserData) ->
     {NewFValue, RestF} = begin
 			   Len = X bsl N + Acc,
 			   <<Bs:Len/binary, Rest2/binary>> = Rest,
-			   {id(decode_msg_identity(Bs, TrUserData), TrUserData),
+			   {id(decode_msg_ssb_identity(Bs, TrUserData),
+			       TrUserData),
 			    Rest2}
 			 end,
-    dfp_read_field_def_address(RestF, 0, 0, F@_1, F@_2,
-			       if Prev == undefined -> NewFValue;
-				  true ->
-				      merge_msg_identity(Prev, NewFValue,
-							 TrUserData)
-			       end,
-			       TrUserData).
+    dfp_read_field_def_ssb_address(RestF, 0, 0, F@_1, F@_2,
+				   if Prev == undefined -> NewFValue;
+				      true ->
+					  merge_msg_ssb_identity(Prev,
+								 NewFValue,
+								 TrUserData)
+				   end,
+				   TrUserData).
 
-skip_varint_address(<<1:1, _:7, Rest/binary>>, Z1, Z2,
-		    F@_1, F@_2, F@_3, TrUserData) ->
-    skip_varint_address(Rest, Z1, Z2, F@_1, F@_2, F@_3,
-			TrUserData);
-skip_varint_address(<<0:1, _:7, Rest/binary>>, Z1, Z2,
-		    F@_1, F@_2, F@_3, TrUserData) ->
-    dfp_read_field_def_address(Rest, Z1, Z2, F@_1, F@_2,
-			       F@_3, TrUserData).
+skip_varint_ssb_address(<<1:1, _:7, Rest/binary>>, Z1,
+			Z2, F@_1, F@_2, F@_3, TrUserData) ->
+    skip_varint_ssb_address(Rest, Z1, Z2, F@_1, F@_2, F@_3,
+			    TrUserData);
+skip_varint_ssb_address(<<0:1, _:7, Rest/binary>>, Z1,
+			Z2, F@_1, F@_2, F@_3, TrUserData) ->
+    dfp_read_field_def_ssb_address(Rest, Z1, Z2, F@_1, F@_2,
+				   F@_3, TrUserData).
 
-skip_length_delimited_address(<<1:1, X:7, Rest/binary>>,
-			      N, Acc, F@_1, F@_2, F@_3, TrUserData)
+skip_length_delimited_ssb_address(<<1:1, X:7,
+				    Rest/binary>>,
+				  N, Acc, F@_1, F@_2, F@_3, TrUserData)
     when N < 57 ->
-    skip_length_delimited_address(Rest, N + 7,
-				  X bsl N + Acc, F@_1, F@_2, F@_3, TrUserData);
-skip_length_delimited_address(<<0:1, X:7, Rest/binary>>,
-			      N, Acc, F@_1, F@_2, F@_3, TrUserData) ->
+    skip_length_delimited_ssb_address(Rest, N + 7,
+				      X bsl N + Acc, F@_1, F@_2, F@_3,
+				      TrUserData);
+skip_length_delimited_ssb_address(<<0:1, X:7,
+				    Rest/binary>>,
+				  N, Acc, F@_1, F@_2, F@_3, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_address(Rest2, 0, 0, F@_1, F@_2,
-			       F@_3, TrUserData).
+    dfp_read_field_def_ssb_address(Rest2, 0, 0, F@_1, F@_2,
+				   F@_3, TrUserData).
 
-skip_group_address(Bin, FNum, Z2, F@_1, F@_2, F@_3,
-		   TrUserData) ->
+skip_group_ssb_address(Bin, FNum, Z2, F@_1, F@_2, F@_3,
+		       TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_address(Rest, 0, Z2, F@_1, F@_2,
-			       F@_3, TrUserData).
+    dfp_read_field_def_ssb_address(Rest, 0, Z2, F@_1, F@_2,
+				   F@_3, TrUserData).
 
-skip_32_address(<<_:32, Rest/binary>>, Z1, Z2, F@_1,
-		F@_2, F@_3, TrUserData) ->
-    dfp_read_field_def_address(Rest, Z1, Z2, F@_1, F@_2,
-			       F@_3, TrUserData).
+skip_32_ssb_address(<<_:32, Rest/binary>>, Z1, Z2, F@_1,
+		    F@_2, F@_3, TrUserData) ->
+    dfp_read_field_def_ssb_address(Rest, Z1, Z2, F@_1, F@_2,
+				   F@_3, TrUserData).
 
-skip_64_address(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
-		F@_2, F@_3, TrUserData) ->
-    dfp_read_field_def_address(Rest, Z1, Z2, F@_1, F@_2,
-			       F@_3, TrUserData).
+skip_64_ssb_address(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
+		    F@_2, F@_3, TrUserData) ->
+    dfp_read_field_def_ssb_address(Rest, Z1, Z2, F@_1, F@_2,
+				   F@_3, TrUserData).
 
-decode_msg_content(Bin, TrUserData) ->
-    dfp_read_field_def_content(Bin, 0, 0,
-			       id(pub, TrUserData), id(undefined, TrUserData),
-			       TrUserData).
+decode_msg_ssb_content(Bin, TrUserData) ->
+    dfp_read_field_def_ssb_content(Bin, 0, 0,
+				   id(pub, TrUserData),
+				   id(undefined, TrUserData), TrUserData).
 
-dfp_read_field_def_content(<<8, Rest/binary>>, Z1, Z2,
-			   F@_1, F@_2, TrUserData) ->
-    d_field_content_tpe(Rest, Z1, Z2, F@_1, F@_2,
-			TrUserData);
-dfp_read_field_def_content(<<18, Rest/binary>>, Z1, Z2,
-			   F@_1, F@_2, TrUserData) ->
-    d_field_content_address(Rest, Z1, Z2, F@_1, F@_2,
+dfp_read_field_def_ssb_content(<<8, Rest/binary>>, Z1,
+			       Z2, F@_1, F@_2, TrUserData) ->
+    d_field_ssb_content_tpe(Rest, Z1, Z2, F@_1, F@_2,
 			    TrUserData);
-dfp_read_field_def_content(<<>>, 0, 0, F@_1, F@_2, _) ->
-    #content{tpe = F@_1, address = F@_2};
-dfp_read_field_def_content(Other, Z1, Z2, F@_1, F@_2,
-			   TrUserData) ->
-    dg_read_field_def_content(Other, Z1, Z2, F@_1, F@_2,
-			      TrUserData).
+dfp_read_field_def_ssb_content(<<18, Rest/binary>>, Z1,
+			       Z2, F@_1, F@_2, TrUserData) ->
+    d_field_ssb_content_address(Rest, Z1, Z2, F@_1, F@_2,
+				TrUserData);
+dfp_read_field_def_ssb_content(<<>>, 0, 0, F@_1, F@_2,
+			       _) ->
+    #ssb_content{tpe = F@_1, address = F@_2};
+dfp_read_field_def_ssb_content(Other, Z1, Z2, F@_1,
+			       F@_2, TrUserData) ->
+    dg_read_field_def_ssb_content(Other, Z1, Z2, F@_1, F@_2,
+				  TrUserData).
 
-dg_read_field_def_content(<<1:1, X:7, Rest/binary>>, N,
-			  Acc, F@_1, F@_2, TrUserData)
+dg_read_field_def_ssb_content(<<1:1, X:7, Rest/binary>>,
+			      N, Acc, F@_1, F@_2, TrUserData)
     when N < 32 - 7 ->
-    dg_read_field_def_content(Rest, N + 7, X bsl N + Acc,
-			      F@_1, F@_2, TrUserData);
-dg_read_field_def_content(<<0:1, X:7, Rest/binary>>, N,
-			  Acc, F@_1, F@_2, TrUserData) ->
+    dg_read_field_def_ssb_content(Rest, N + 7,
+				  X bsl N + Acc, F@_1, F@_2, TrUserData);
+dg_read_field_def_ssb_content(<<0:1, X:7, Rest/binary>>,
+			      N, Acc, F@_1, F@_2, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
       8 ->
-	  d_field_content_tpe(Rest, 0, 0, F@_1, F@_2, TrUserData);
+	  d_field_ssb_content_tpe(Rest, 0, 0, F@_1, F@_2,
+				  TrUserData);
       18 ->
-	  d_field_content_address(Rest, 0, 0, F@_1, F@_2,
+	  d_field_ssb_content_address(Rest, 0, 0, F@_1, F@_2,
+				      TrUserData);
+      _ ->
+	  case Key band 7 of
+	    0 ->
+		skip_varint_ssb_content(Rest, 0, 0, F@_1, F@_2,
+					TrUserData);
+	    1 ->
+		skip_64_ssb_content(Rest, 0, 0, F@_1, F@_2, TrUserData);
+	    2 ->
+		skip_length_delimited_ssb_content(Rest, 0, 0, F@_1,
+						  F@_2, TrUserData);
+	    3 ->
+		skip_group_ssb_content(Rest, Key bsr 3, 0, F@_1, F@_2,
+				       TrUserData);
+	    5 ->
+		skip_32_ssb_content(Rest, 0, 0, F@_1, F@_2, TrUserData)
+	  end
+    end;
+dg_read_field_def_ssb_content(<<>>, 0, 0, F@_1, F@_2,
+			      _) ->
+    #ssb_content{tpe = F@_1, address = F@_2}.
+
+d_field_ssb_content_tpe(<<1:1, X:7, Rest/binary>>, N,
+			Acc, F@_1, F@_2, TrUserData)
+    when N < 57 ->
+    d_field_ssb_content_tpe(Rest, N + 7, X bsl N + Acc,
+			    F@_1, F@_2, TrUserData);
+d_field_ssb_content_tpe(<<0:1, X:7, Rest/binary>>, N,
+			Acc, _, F@_2, TrUserData) ->
+    {NewFValue, RestF} = {id(d_enum_ssb_msgtype(begin
+						  <<Res:32/signed-native>> =
+						      <<(X bsl N +
+							   Acc):32/unsigned-native>>,
+						  id(Res, TrUserData)
+						end),
+			     TrUserData),
+			  Rest},
+    dfp_read_field_def_ssb_content(RestF, 0, 0, NewFValue,
+				   F@_2, TrUserData).
+
+d_field_ssb_content_address(<<1:1, X:7, Rest/binary>>,
+			    N, Acc, F@_1, F@_2, TrUserData)
+    when N < 57 ->
+    d_field_ssb_content_address(Rest, N + 7, X bsl N + Acc,
+				F@_1, F@_2, TrUserData);
+d_field_ssb_content_address(<<0:1, X:7, Rest/binary>>,
+			    N, Acc, F@_1, Prev, TrUserData) ->
+    {NewFValue, RestF} = begin
+			   Len = X bsl N + Acc,
+			   <<Bs:Len/binary, Rest2/binary>> = Rest,
+			   {id(decode_msg_ssb_address(Bs, TrUserData),
+			       TrUserData),
+			    Rest2}
+			 end,
+    dfp_read_field_def_ssb_content(RestF, 0, 0, F@_1,
+				   if Prev == undefined -> NewFValue;
+				      true ->
+					  merge_msg_ssb_address(Prev, NewFValue,
+								TrUserData)
+				   end,
+				   TrUserData).
+
+skip_varint_ssb_content(<<1:1, _:7, Rest/binary>>, Z1,
+			Z2, F@_1, F@_2, TrUserData) ->
+    skip_varint_ssb_content(Rest, Z1, Z2, F@_1, F@_2,
+			    TrUserData);
+skip_varint_ssb_content(<<0:1, _:7, Rest/binary>>, Z1,
+			Z2, F@_1, F@_2, TrUserData) ->
+    dfp_read_field_def_ssb_content(Rest, Z1, Z2, F@_1, F@_2,
+				   TrUserData).
+
+skip_length_delimited_ssb_content(<<1:1, X:7,
+				    Rest/binary>>,
+				  N, Acc, F@_1, F@_2, TrUserData)
+    when N < 57 ->
+    skip_length_delimited_ssb_content(Rest, N + 7,
+				      X bsl N + Acc, F@_1, F@_2, TrUserData);
+skip_length_delimited_ssb_content(<<0:1, X:7,
+				    Rest/binary>>,
+				  N, Acc, F@_1, F@_2, TrUserData) ->
+    Length = X bsl N + Acc,
+    <<_:Length/binary, Rest2/binary>> = Rest,
+    dfp_read_field_def_ssb_content(Rest2, 0, 0, F@_1, F@_2,
+				   TrUserData).
+
+skip_group_ssb_content(Bin, FNum, Z2, F@_1, F@_2,
+		       TrUserData) ->
+    {_, Rest} = read_group(Bin, FNum),
+    dfp_read_field_def_ssb_content(Rest, 0, Z2, F@_1, F@_2,
+				   TrUserData).
+
+skip_32_ssb_content(<<_:32, Rest/binary>>, Z1, Z2, F@_1,
+		    F@_2, TrUserData) ->
+    dfp_read_field_def_ssb_content(Rest, Z1, Z2, F@_1, F@_2,
+				   TrUserData).
+
+skip_64_ssb_content(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
+		    F@_2, TrUserData) ->
+    dfp_read_field_def_ssb_content(Rest, Z1, Z2, F@_1, F@_2,
+				   TrUserData).
+
+decode_msg_ssb_msg(Bin, TrUserData) ->
+    dfp_read_field_def_ssb_msg(Bin, 0, 0,
+			       id(undefined, TrUserData),
+			       id(undefined, TrUserData), TrUserData).
+
+dfp_read_field_def_ssb_msg(<<10, Rest/binary>>, Z1, Z2,
+			   F@_1, F@_2, TrUserData) ->
+    d_field_ssb_msg_author(Rest, Z1, Z2, F@_1, F@_2,
+			   TrUserData);
+dfp_read_field_def_ssb_msg(<<18, Rest/binary>>, Z1, Z2,
+			   F@_1, F@_2, TrUserData) ->
+    d_field_ssb_msg_content(Rest, Z1, Z2, F@_1, F@_2,
+			    TrUserData);
+dfp_read_field_def_ssb_msg(<<>>, 0, 0, F@_1, F@_2, _) ->
+    #ssb_msg{author = F@_1, content = F@_2};
+dfp_read_field_def_ssb_msg(Other, Z1, Z2, F@_1, F@_2,
+			   TrUserData) ->
+    dg_read_field_def_ssb_msg(Other, Z1, Z2, F@_1, F@_2,
+			      TrUserData).
+
+dg_read_field_def_ssb_msg(<<1:1, X:7, Rest/binary>>, N,
+			  Acc, F@_1, F@_2, TrUserData)
+    when N < 32 - 7 ->
+    dg_read_field_def_ssb_msg(Rest, N + 7, X bsl N + Acc,
+			      F@_1, F@_2, TrUserData);
+dg_read_field_def_ssb_msg(<<0:1, X:7, Rest/binary>>, N,
+			  Acc, F@_1, F@_2, TrUserData) ->
+    Key = X bsl N + Acc,
+    case Key of
+      10 ->
+	  d_field_ssb_msg_author(Rest, 0, 0, F@_1, F@_2,
+				 TrUserData);
+      18 ->
+	  d_field_ssb_msg_content(Rest, 0, 0, F@_1, F@_2,
 				  TrUserData);
       _ ->
 	  case Key band 7 of
 	    0 ->
-		skip_varint_content(Rest, 0, 0, F@_1, F@_2, TrUserData);
+		skip_varint_ssb_msg(Rest, 0, 0, F@_1, F@_2, TrUserData);
 	    1 ->
-		skip_64_content(Rest, 0, 0, F@_1, F@_2, TrUserData);
+		skip_64_ssb_msg(Rest, 0, 0, F@_1, F@_2, TrUserData);
 	    2 ->
-		skip_length_delimited_content(Rest, 0, 0, F@_1, F@_2,
+		skip_length_delimited_ssb_msg(Rest, 0, 0, F@_1, F@_2,
 					      TrUserData);
 	    3 ->
-		skip_group_content(Rest, Key bsr 3, 0, F@_1, F@_2,
+		skip_group_ssb_msg(Rest, Key bsr 3, 0, F@_1, F@_2,
 				   TrUserData);
-	    5 -> skip_32_content(Rest, 0, 0, F@_1, F@_2, TrUserData)
+	    5 -> skip_32_ssb_msg(Rest, 0, 0, F@_1, F@_2, TrUserData)
 	  end
     end;
-dg_read_field_def_content(<<>>, 0, 0, F@_1, F@_2, _) ->
-    #content{tpe = F@_1, address = F@_2}.
+dg_read_field_def_ssb_msg(<<>>, 0, 0, F@_1, F@_2, _) ->
+    #ssb_msg{author = F@_1, content = F@_2}.
 
-d_field_content_tpe(<<1:1, X:7, Rest/binary>>, N, Acc,
-		    F@_1, F@_2, TrUserData)
+d_field_ssb_msg_author(<<1:1, X:7, Rest/binary>>, N,
+		       Acc, F@_1, F@_2, TrUserData)
     when N < 57 ->
-    d_field_content_tpe(Rest, N + 7, X bsl N + Acc, F@_1,
-			F@_2, TrUserData);
-d_field_content_tpe(<<0:1, X:7, Rest/binary>>, N, Acc,
-		    _, F@_2, TrUserData) ->
-    {NewFValue, RestF} = {id(d_enum_msgtype(begin
-					      <<Res:32/signed-native>> = <<(X
-									      bsl
-									      N
-									      +
-									      Acc):32/unsigned-native>>,
-					      id(Res, TrUserData)
-					    end),
-			     TrUserData),
-			  Rest},
-    dfp_read_field_def_content(RestF, 0, 0, NewFValue, F@_2,
-			       TrUserData).
+    d_field_ssb_msg_author(Rest, N + 7, X bsl N + Acc, F@_1,
+			   F@_2, TrUserData);
+d_field_ssb_msg_author(<<0:1, X:7, Rest/binary>>, N,
+		       Acc, Prev, F@_2, TrUserData) ->
+    {NewFValue, RestF} = begin
+			   Len = X bsl N + Acc,
+			   <<Bs:Len/binary, Rest2/binary>> = Rest,
+			   {id(decode_msg_ssb_identity(Bs, TrUserData),
+			       TrUserData),
+			    Rest2}
+			 end,
+    dfp_read_field_def_ssb_msg(RestF, 0, 0,
+			       if Prev == undefined -> NewFValue;
+				  true ->
+				      merge_msg_ssb_identity(Prev, NewFValue,
+							     TrUserData)
+			       end,
+			       F@_2, TrUserData).
 
-d_field_content_address(<<1:1, X:7, Rest/binary>>, N,
+d_field_ssb_msg_content(<<1:1, X:7, Rest/binary>>, N,
 			Acc, F@_1, F@_2, TrUserData)
     when N < 57 ->
-    d_field_content_address(Rest, N + 7, X bsl N + Acc,
+    d_field_ssb_msg_content(Rest, N + 7, X bsl N + Acc,
 			    F@_1, F@_2, TrUserData);
-d_field_content_address(<<0:1, X:7, Rest/binary>>, N,
+d_field_ssb_msg_content(<<0:1, X:7, Rest/binary>>, N,
 			Acc, F@_1, Prev, TrUserData) ->
     {NewFValue, RestF} = begin
 			   Len = X bsl N + Acc,
 			   <<Bs:Len/binary, Rest2/binary>> = Rest,
-			   {id(decode_msg_address(Bs, TrUserData), TrUserData),
+			   {id(decode_msg_ssb_content(Bs, TrUserData),
+			       TrUserData),
 			    Rest2}
 			 end,
-    dfp_read_field_def_content(RestF, 0, 0, F@_1,
+    dfp_read_field_def_ssb_msg(RestF, 0, 0, F@_1,
 			       if Prev == undefined -> NewFValue;
 				  true ->
-				      merge_msg_address(Prev, NewFValue,
-							TrUserData)
+				      merge_msg_ssb_content(Prev, NewFValue,
+							    TrUserData)
 			       end,
 			       TrUserData).
 
-skip_varint_content(<<1:1, _:7, Rest/binary>>, Z1, Z2,
+skip_varint_ssb_msg(<<1:1, _:7, Rest/binary>>, Z1, Z2,
 		    F@_1, F@_2, TrUserData) ->
-    skip_varint_content(Rest, Z1, Z2, F@_1, F@_2,
+    skip_varint_ssb_msg(Rest, Z1, Z2, F@_1, F@_2,
 			TrUserData);
-skip_varint_content(<<0:1, _:7, Rest/binary>>, Z1, Z2,
+skip_varint_ssb_msg(<<0:1, _:7, Rest/binary>>, Z1, Z2,
 		    F@_1, F@_2, TrUserData) ->
-    dfp_read_field_def_content(Rest, Z1, Z2, F@_1, F@_2,
+    dfp_read_field_def_ssb_msg(Rest, Z1, Z2, F@_1, F@_2,
 			       TrUserData).
 
-skip_length_delimited_content(<<1:1, X:7, Rest/binary>>,
+skip_length_delimited_ssb_msg(<<1:1, X:7, Rest/binary>>,
 			      N, Acc, F@_1, F@_2, TrUserData)
     when N < 57 ->
-    skip_length_delimited_content(Rest, N + 7,
+    skip_length_delimited_ssb_msg(Rest, N + 7,
 				  X bsl N + Acc, F@_1, F@_2, TrUserData);
-skip_length_delimited_content(<<0:1, X:7, Rest/binary>>,
+skip_length_delimited_ssb_msg(<<0:1, X:7, Rest/binary>>,
 			      N, Acc, F@_1, F@_2, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_content(Rest2, 0, 0, F@_1, F@_2,
+    dfp_read_field_def_ssb_msg(Rest2, 0, 0, F@_1, F@_2,
 			       TrUserData).
 
-skip_group_content(Bin, FNum, Z2, F@_1, F@_2,
+skip_group_ssb_msg(Bin, FNum, Z2, F@_1, F@_2,
 		   TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_content(Rest, 0, Z2, F@_1, F@_2,
+    dfp_read_field_def_ssb_msg(Rest, 0, Z2, F@_1, F@_2,
 			       TrUserData).
 
-skip_32_content(<<_:32, Rest/binary>>, Z1, Z2, F@_1,
+skip_32_ssb_msg(<<_:32, Rest/binary>>, Z1, Z2, F@_1,
 		F@_2, TrUserData) ->
-    dfp_read_field_def_content(Rest, Z1, Z2, F@_1, F@_2,
+    dfp_read_field_def_ssb_msg(Rest, Z1, Z2, F@_1, F@_2,
 			       TrUserData).
 
-skip_64_content(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
+skip_64_ssb_msg(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
 		F@_2, TrUserData) ->
-    dfp_read_field_def_content(Rest, Z1, Z2, F@_1, F@_2,
+    dfp_read_field_def_ssb_msg(Rest, Z1, Z2, F@_1, F@_2,
 			       TrUserData).
 
-decode_msg_msg(Bin, TrUserData) ->
-    dfp_read_field_def_msg(Bin, 0, 0,
-			   id(undefined, TrUserData), id(undefined, TrUserData),
-			   TrUserData).
+d_enum_ssb_keytype(1) -> ed25519;
+d_enum_ssb_keytype(2) -> ed448;
+d_enum_ssb_keytype(V) -> V.
 
-dfp_read_field_def_msg(<<10, Rest/binary>>, Z1, Z2,
-		       F@_1, F@_2, TrUserData) ->
-    d_field_msg_author(Rest, Z1, Z2, F@_1, F@_2,
-		       TrUserData);
-dfp_read_field_def_msg(<<18, Rest/binary>>, Z1, Z2,
-		       F@_1, F@_2, TrUserData) ->
-    d_field_msg_content(Rest, Z1, Z2, F@_1, F@_2,
-			TrUserData);
-dfp_read_field_def_msg(<<>>, 0, 0, F@_1, F@_2, _) ->
-    #msg{author = F@_1, content = F@_2};
-dfp_read_field_def_msg(Other, Z1, Z2, F@_1, F@_2,
-		       TrUserData) ->
-    dg_read_field_def_msg(Other, Z1, Z2, F@_1, F@_2,
-			  TrUserData).
-
-dg_read_field_def_msg(<<1:1, X:7, Rest/binary>>, N, Acc,
-		      F@_1, F@_2, TrUserData)
-    when N < 32 - 7 ->
-    dg_read_field_def_msg(Rest, N + 7, X bsl N + Acc, F@_1,
-			  F@_2, TrUserData);
-dg_read_field_def_msg(<<0:1, X:7, Rest/binary>>, N, Acc,
-		      F@_1, F@_2, TrUserData) ->
-    Key = X bsl N + Acc,
-    case Key of
-      10 ->
-	  d_field_msg_author(Rest, 0, 0, F@_1, F@_2, TrUserData);
-      18 ->
-	  d_field_msg_content(Rest, 0, 0, F@_1, F@_2, TrUserData);
-      _ ->
-	  case Key band 7 of
-	    0 ->
-		skip_varint_msg(Rest, 0, 0, F@_1, F@_2, TrUserData);
-	    1 -> skip_64_msg(Rest, 0, 0, F@_1, F@_2, TrUserData);
-	    2 ->
-		skip_length_delimited_msg(Rest, 0, 0, F@_1, F@_2,
-					  TrUserData);
-	    3 ->
-		skip_group_msg(Rest, Key bsr 3, 0, F@_1, F@_2,
-			       TrUserData);
-	    5 -> skip_32_msg(Rest, 0, 0, F@_1, F@_2, TrUserData)
-	  end
-    end;
-dg_read_field_def_msg(<<>>, 0, 0, F@_1, F@_2, _) ->
-    #msg{author = F@_1, content = F@_2}.
-
-d_field_msg_author(<<1:1, X:7, Rest/binary>>, N, Acc,
-		   F@_1, F@_2, TrUserData)
-    when N < 57 ->
-    d_field_msg_author(Rest, N + 7, X bsl N + Acc, F@_1,
-		       F@_2, TrUserData);
-d_field_msg_author(<<0:1, X:7, Rest/binary>>, N, Acc,
-		   Prev, F@_2, TrUserData) ->
-    {NewFValue, RestF} = begin
-			   Len = X bsl N + Acc,
-			   <<Bs:Len/binary, Rest2/binary>> = Rest,
-			   {id(decode_msg_identity(Bs, TrUserData), TrUserData),
-			    Rest2}
-			 end,
-    dfp_read_field_def_msg(RestF, 0, 0,
-			   if Prev == undefined -> NewFValue;
-			      true ->
-				  merge_msg_identity(Prev, NewFValue,
-						     TrUserData)
-			   end,
-			   F@_2, TrUserData).
-
-d_field_msg_content(<<1:1, X:7, Rest/binary>>, N, Acc,
-		    F@_1, F@_2, TrUserData)
-    when N < 57 ->
-    d_field_msg_content(Rest, N + 7, X bsl N + Acc, F@_1,
-			F@_2, TrUserData);
-d_field_msg_content(<<0:1, X:7, Rest/binary>>, N, Acc,
-		    F@_1, Prev, TrUserData) ->
-    {NewFValue, RestF} = begin
-			   Len = X bsl N + Acc,
-			   <<Bs:Len/binary, Rest2/binary>> = Rest,
-			   {id(decode_msg_content(Bs, TrUserData), TrUserData),
-			    Rest2}
-			 end,
-    dfp_read_field_def_msg(RestF, 0, 0, F@_1,
-			   if Prev == undefined -> NewFValue;
-			      true ->
-				  merge_msg_content(Prev, NewFValue, TrUserData)
-			   end,
-			   TrUserData).
-
-skip_varint_msg(<<1:1, _:7, Rest/binary>>, Z1, Z2, F@_1,
-		F@_2, TrUserData) ->
-    skip_varint_msg(Rest, Z1, Z2, F@_1, F@_2, TrUserData);
-skip_varint_msg(<<0:1, _:7, Rest/binary>>, Z1, Z2, F@_1,
-		F@_2, TrUserData) ->
-    dfp_read_field_def_msg(Rest, Z1, Z2, F@_1, F@_2,
-			   TrUserData).
-
-skip_length_delimited_msg(<<1:1, X:7, Rest/binary>>, N,
-			  Acc, F@_1, F@_2, TrUserData)
-    when N < 57 ->
-    skip_length_delimited_msg(Rest, N + 7, X bsl N + Acc,
-			      F@_1, F@_2, TrUserData);
-skip_length_delimited_msg(<<0:1, X:7, Rest/binary>>, N,
-			  Acc, F@_1, F@_2, TrUserData) ->
-    Length = X bsl N + Acc,
-    <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_msg(Rest2, 0, 0, F@_1, F@_2,
-			   TrUserData).
-
-skip_group_msg(Bin, FNum, Z2, F@_1, F@_2, TrUserData) ->
-    {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_msg(Rest, 0, Z2, F@_1, F@_2,
-			   TrUserData).
-
-skip_32_msg(<<_:32, Rest/binary>>, Z1, Z2, F@_1, F@_2,
-	    TrUserData) ->
-    dfp_read_field_def_msg(Rest, Z1, Z2, F@_1, F@_2,
-			   TrUserData).
-
-skip_64_msg(<<_:64, Rest/binary>>, Z1, Z2, F@_1, F@_2,
-	    TrUserData) ->
-    dfp_read_field_def_msg(Rest, Z1, Z2, F@_1, F@_2,
-			   TrUserData).
-
-decode_msg_invite(Bin, TrUserData) ->
-    dfp_read_field_def_invite(Bin, 0, 0,
-			      id(undefined, TrUserData), TrUserData).
-
-dfp_read_field_def_invite(<<10, Rest/binary>>, Z1, Z2,
-			  F@_1, TrUserData) ->
-    d_field_invite_keys(Rest, Z1, Z2, F@_1, TrUserData);
-dfp_read_field_def_invite(<<>>, 0, 0, F@_1, _) ->
-    #invite{keys = F@_1};
-dfp_read_field_def_invite(Other, Z1, Z2, F@_1,
-			  TrUserData) ->
-    dg_read_field_def_invite(Other, Z1, Z2, F@_1,
-			     TrUserData).
-
-dg_read_field_def_invite(<<1:1, X:7, Rest/binary>>, N,
-			 Acc, F@_1, TrUserData)
-    when N < 32 - 7 ->
-    dg_read_field_def_invite(Rest, N + 7, X bsl N + Acc,
-			     F@_1, TrUserData);
-dg_read_field_def_invite(<<0:1, X:7, Rest/binary>>, N,
-			 Acc, F@_1, TrUserData) ->
-    Key = X bsl N + Acc,
-    case Key of
-      10 -> d_field_invite_keys(Rest, 0, 0, F@_1, TrUserData);
-      _ ->
-	  case Key band 7 of
-	    0 -> skip_varint_invite(Rest, 0, 0, F@_1, TrUserData);
-	    1 -> skip_64_invite(Rest, 0, 0, F@_1, TrUserData);
-	    2 ->
-		skip_length_delimited_invite(Rest, 0, 0, F@_1,
-					     TrUserData);
-	    3 ->
-		skip_group_invite(Rest, Key bsr 3, 0, F@_1, TrUserData);
-	    5 -> skip_32_invite(Rest, 0, 0, F@_1, TrUserData)
-	  end
-    end;
-dg_read_field_def_invite(<<>>, 0, 0, F@_1, _) ->
-    #invite{keys = F@_1}.
-
-d_field_invite_keys(<<1:1, X:7, Rest/binary>>, N, Acc,
-		    F@_1, TrUserData)
-    when N < 57 ->
-    d_field_invite_keys(Rest, N + 7, X bsl N + Acc, F@_1,
-			TrUserData);
-d_field_invite_keys(<<0:1, X:7, Rest/binary>>, N, Acc,
-		    Prev, TrUserData) ->
-    {NewFValue, RestF} = begin
-			   Len = X bsl N + Acc,
-			   <<Bs:Len/binary, Rest2/binary>> = Rest,
-			   {id(decode_msg_identity(Bs, TrUserData), TrUserData),
-			    Rest2}
-			 end,
-    dfp_read_field_def_invite(RestF, 0, 0,
-			      if Prev == undefined -> NewFValue;
-				 true ->
-				     merge_msg_identity(Prev, NewFValue,
-							TrUserData)
-			      end,
-			      TrUserData).
-
-skip_varint_invite(<<1:1, _:7, Rest/binary>>, Z1, Z2,
-		   F@_1, TrUserData) ->
-    skip_varint_invite(Rest, Z1, Z2, F@_1, TrUserData);
-skip_varint_invite(<<0:1, _:7, Rest/binary>>, Z1, Z2,
-		   F@_1, TrUserData) ->
-    dfp_read_field_def_invite(Rest, Z1, Z2, F@_1,
-			      TrUserData).
-
-skip_length_delimited_invite(<<1:1, X:7, Rest/binary>>,
-			     N, Acc, F@_1, TrUserData)
-    when N < 57 ->
-    skip_length_delimited_invite(Rest, N + 7, X bsl N + Acc,
-				 F@_1, TrUserData);
-skip_length_delimited_invite(<<0:1, X:7, Rest/binary>>,
-			     N, Acc, F@_1, TrUserData) ->
-    Length = X bsl N + Acc,
-    <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_invite(Rest2, 0, 0, F@_1,
-			      TrUserData).
-
-skip_group_invite(Bin, FNum, Z2, F@_1, TrUserData) ->
-    {_, Rest} = read_group(Bin, FNum),
-    dfp_read_field_def_invite(Rest, 0, Z2, F@_1,
-			      TrUserData).
-
-skip_32_invite(<<_:32, Rest/binary>>, Z1, Z2, F@_1,
-	       TrUserData) ->
-    dfp_read_field_def_invite(Rest, Z1, Z2, F@_1,
-			      TrUserData).
-
-skip_64_invite(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
-	       TrUserData) ->
-    dfp_read_field_def_invite(Rest, Z1, Z2, F@_1,
-			      TrUserData).
-
-d_enum_keytype(1) -> ed25519;
-d_enum_keytype(2) -> ed448;
-d_enum_keytype(V) -> V.
-
-d_enum_msgtype(1) -> pub;
-d_enum_msgtype(2) -> invite;
-d_enum_msgtype(V) -> V.
+d_enum_ssb_msgtype(1) -> pub;
+d_enum_ssb_msgtype(2) -> invite;
+d_enum_ssb_msgtype(V) -> V.
 
 read_group(Bin, FieldNum) ->
     {NumBytes, EndTagLen} = read_gr_b(Bin, 0, 0, 0, 0, FieldNum),
@@ -1193,100 +1106,93 @@ merge_msgs(Prev, New, Opts)
 merge_msgs(Prev, New, MsgName, Opts) ->
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
-      identity -> merge_msg_identity(Prev, New, TrUserData);
-      address -> merge_msg_address(Prev, New, TrUserData);
-      content -> merge_msg_content(Prev, New, TrUserData);
-      msg -> merge_msg_msg(Prev, New, TrUserData);
-      invite -> merge_msg_invite(Prev, New, TrUserData)
+      ssb_identity ->
+	  merge_msg_ssb_identity(Prev, New, TrUserData);
+      ssb_address ->
+	  merge_msg_ssb_address(Prev, New, TrUserData);
+      ssb_content ->
+	  merge_msg_ssb_content(Prev, New, TrUserData);
+      ssb_msg -> merge_msg_ssb_msg(Prev, New, TrUserData)
     end.
 
--compile({nowarn_unused_function,merge_msg_identity/3}).
-merge_msg_identity(#identity{tpe = PFtpe,
-			     secret_key = PFsecret_key,
-			     public_key = PFpublic_key, text = PFtext},
-		   #identity{tpe = NFtpe, secret_key = NFsecret_key,
-			     public_key = NFpublic_key, text = NFtext},
-		   _) ->
-    #identity{tpe =
-		  if NFtpe =:= undefined -> PFtpe;
-		     true -> NFtpe
-		  end,
-	      secret_key =
-		  if NFsecret_key =:= undefined -> PFsecret_key;
-		     true -> NFsecret_key
-		  end,
-	      public_key =
-		  if NFpublic_key =:= undefined -> PFpublic_key;
-		     true -> NFpublic_key
-		  end,
-	      text =
-		  if NFtext =:= undefined -> PFtext;
-		     true -> NFtext
-		  end}.
+-compile({nowarn_unused_function,merge_msg_ssb_identity/3}).
+merge_msg_ssb_identity(#ssb_identity{tpe = PFtpe,
+				     secret_key = PFsecret_key,
+				     public_key = PFpublic_key, text = PFtext},
+		       #ssb_identity{tpe = NFtpe, secret_key = NFsecret_key,
+				     public_key = NFpublic_key, text = NFtext},
+		       _) ->
+    #ssb_identity{tpe =
+		      if NFtpe =:= undefined -> PFtpe;
+			 true -> NFtpe
+		      end,
+		  secret_key =
+		      if NFsecret_key =:= undefined -> PFsecret_key;
+			 true -> NFsecret_key
+		      end,
+		  public_key =
+		      if NFpublic_key =:= undefined -> PFpublic_key;
+			 true -> NFpublic_key
+		      end,
+		  text =
+		      if NFtext =:= undefined -> PFtext;
+			 true -> NFtext
+		      end}.
 
--compile({nowarn_unused_function,merge_msg_address/3}).
-merge_msg_address(#address{host = PFhost, port = PFport,
-			   key = PFkey},
-		  #address{host = NFhost, port = NFport, key = NFkey},
+-compile({nowarn_unused_function,merge_msg_ssb_address/3}).
+merge_msg_ssb_address(#ssb_address{host = PFhost,
+				   port = PFport, key = PFkey},
+		      #ssb_address{host = NFhost, port = NFport, key = NFkey},
+		      TrUserData) ->
+    #ssb_address{host =
+		     if NFhost =:= undefined -> PFhost;
+			true -> NFhost
+		     end,
+		 port =
+		     if NFport =:= undefined -> PFport;
+			true -> NFport
+		     end,
+		 key =
+		     if PFkey /= undefined, NFkey /= undefined ->
+			    merge_msg_ssb_identity(PFkey, NFkey, TrUserData);
+			PFkey == undefined -> NFkey;
+			NFkey == undefined -> PFkey
+		     end}.
+
+-compile({nowarn_unused_function,merge_msg_ssb_content/3}).
+merge_msg_ssb_content(#ssb_content{tpe = PFtpe,
+				   address = PFaddress},
+		      #ssb_content{tpe = NFtpe, address = NFaddress},
+		      TrUserData) ->
+    #ssb_content{tpe =
+		     if NFtpe =:= undefined -> PFtpe;
+			true -> NFtpe
+		     end,
+		 address =
+		     if PFaddress /= undefined, NFaddress /= undefined ->
+			    merge_msg_ssb_address(PFaddress, NFaddress,
+						  TrUserData);
+			PFaddress == undefined -> NFaddress;
+			NFaddress == undefined -> PFaddress
+		     end}.
+
+-compile({nowarn_unused_function,merge_msg_ssb_msg/3}).
+merge_msg_ssb_msg(#ssb_msg{author = PFauthor,
+			   content = PFcontent},
+		  #ssb_msg{author = NFauthor, content = NFcontent},
 		  TrUserData) ->
-    #address{host =
-		 if NFhost =:= undefined -> PFhost;
-		    true -> NFhost
+    #ssb_msg{author =
+		 if PFauthor /= undefined, NFauthor /= undefined ->
+			merge_msg_ssb_identity(PFauthor, NFauthor, TrUserData);
+		    PFauthor == undefined -> NFauthor;
+		    NFauthor == undefined -> PFauthor
 		 end,
-	     port =
-		 if NFport =:= undefined -> PFport;
-		    true -> NFport
-		 end,
-	     key =
-		 if PFkey /= undefined, NFkey /= undefined ->
-			merge_msg_identity(PFkey, NFkey, TrUserData);
-		    PFkey == undefined -> NFkey;
-		    NFkey == undefined -> PFkey
+	     content =
+		 if PFcontent /= undefined, NFcontent /= undefined ->
+			merge_msg_ssb_content(PFcontent, NFcontent, TrUserData);
+		    PFcontent == undefined -> NFcontent;
+		    NFcontent == undefined -> PFcontent
 		 end}.
-
--compile({nowarn_unused_function,merge_msg_content/3}).
-merge_msg_content(#content{tpe = PFtpe,
-			   address = PFaddress},
-		  #content{tpe = NFtpe, address = NFaddress},
-		  TrUserData) ->
-    #content{tpe =
-		 if NFtpe =:= undefined -> PFtpe;
-		    true -> NFtpe
-		 end,
-	     address =
-		 if PFaddress /= undefined, NFaddress /= undefined ->
-			merge_msg_address(PFaddress, NFaddress, TrUserData);
-		    PFaddress == undefined -> NFaddress;
-		    NFaddress == undefined -> PFaddress
-		 end}.
-
--compile({nowarn_unused_function,merge_msg_msg/3}).
-merge_msg_msg(#msg{author = PFauthor,
-		   content = PFcontent},
-	      #msg{author = NFauthor, content = NFcontent},
-	      TrUserData) ->
-    #msg{author =
-	     if PFauthor /= undefined, NFauthor /= undefined ->
-		    merge_msg_identity(PFauthor, NFauthor, TrUserData);
-		PFauthor == undefined -> NFauthor;
-		NFauthor == undefined -> PFauthor
-	     end,
-	 content =
-	     if PFcontent /= undefined, NFcontent /= undefined ->
-		    merge_msg_content(PFcontent, NFcontent, TrUserData);
-		PFcontent == undefined -> NFcontent;
-		NFcontent == undefined -> PFcontent
-	     end}.
-
--compile({nowarn_unused_function,merge_msg_invite/3}).
-merge_msg_invite(#invite{keys = PFkeys},
-		 #invite{keys = NFkeys}, TrUserData) ->
-    #invite{keys =
-		if PFkeys /= undefined, NFkeys /= undefined ->
-		       merge_msg_identity(PFkeys, NFkeys, TrUserData);
-		   PFkeys == undefined -> NFkeys;
-		   NFkeys == undefined -> PFkeys
-		end}.
 
 
 verify_msg(Msg) when tuple_size(Msg) >= 1 ->
@@ -1304,22 +1210,24 @@ verify_msg(X, _Opts) ->
 verify_msg(Msg, MsgName, Opts) ->
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
-      identity -> v_msg_identity(Msg, [MsgName], TrUserData);
-      address -> v_msg_address(Msg, [MsgName], TrUserData);
-      content -> v_msg_content(Msg, [MsgName], TrUserData);
-      msg -> v_msg_msg(Msg, [MsgName], TrUserData);
-      invite -> v_msg_invite(Msg, [MsgName], TrUserData);
+      ssb_identity ->
+	  v_msg_ssb_identity(Msg, [MsgName], TrUserData);
+      ssb_address ->
+	  v_msg_ssb_address(Msg, [MsgName], TrUserData);
+      ssb_content ->
+	  v_msg_ssb_content(Msg, [MsgName], TrUserData);
+      ssb_msg -> v_msg_ssb_msg(Msg, [MsgName], TrUserData);
       _ -> mk_type_error(not_a_known_message, Msg, [])
     end.
 
 
--compile({nowarn_unused_function,v_msg_identity/3}).
--dialyzer({nowarn_function,v_msg_identity/3}).
-v_msg_identity(#identity{tpe = F1, secret_key = F2,
-			 public_key = F3, text = F4},
-	       Path, TrUserData) ->
+-compile({nowarn_unused_function,v_msg_ssb_identity/3}).
+-dialyzer({nowarn_function,v_msg_ssb_identity/3}).
+v_msg_ssb_identity(#ssb_identity{tpe = F1,
+				 secret_key = F2, public_key = F3, text = F4},
+		   Path, TrUserData) ->
     if F1 == undefined -> ok;
-       true -> v_enum_keytype(F1, [tpe | Path], TrUserData)
+       true -> v_enum_ssb_keytype(F1, [tpe | Path], TrUserData)
     end,
     if F2 == undefined -> ok;
        true ->
@@ -1333,13 +1241,14 @@ v_msg_identity(#identity{tpe = F1, secret_key = F2,
        true -> v_type_bytes(F4, [text | Path], TrUserData)
     end,
     ok;
-v_msg_identity(X, Path, _TrUserData) ->
-    mk_type_error({expected_msg, identity}, X, Path).
+v_msg_ssb_identity(X, Path, _TrUserData) ->
+    mk_type_error({expected_msg, ssb_identity}, X, Path).
 
--compile({nowarn_unused_function,v_msg_address/3}).
--dialyzer({nowarn_function,v_msg_address/3}).
-v_msg_address(#address{host = F1, port = F2, key = F3},
-	      Path, TrUserData) ->
+-compile({nowarn_unused_function,v_msg_ssb_address/3}).
+-dialyzer({nowarn_function,v_msg_ssb_address/3}).
+v_msg_ssb_address(#ssb_address{host = F1, port = F2,
+			       key = F3},
+		  Path, TrUserData) ->
     if F1 == undefined -> ok;
        true -> v_type_bytes(F1, [host | Path], TrUserData)
     end,
@@ -1347,69 +1256,62 @@ v_msg_address(#address{host = F1, port = F2, key = F3},
        true -> v_type_int32(F2, [port | Path], TrUserData)
     end,
     if F3 == undefined -> ok;
-       true -> v_msg_identity(F3, [key | Path], TrUserData)
+       true -> v_msg_ssb_identity(F3, [key | Path], TrUserData)
     end,
     ok;
-v_msg_address(X, Path, _TrUserData) ->
-    mk_type_error({expected_msg, address}, X, Path).
+v_msg_ssb_address(X, Path, _TrUserData) ->
+    mk_type_error({expected_msg, ssb_address}, X, Path).
 
--compile({nowarn_unused_function,v_msg_content/3}).
--dialyzer({nowarn_function,v_msg_content/3}).
-v_msg_content(#content{tpe = F1, address = F2}, Path,
+-compile({nowarn_unused_function,v_msg_ssb_content/3}).
+-dialyzer({nowarn_function,v_msg_ssb_content/3}).
+v_msg_ssb_content(#ssb_content{tpe = F1, address = F2},
+		  Path, TrUserData) ->
+    if F1 == undefined -> ok;
+       true -> v_enum_ssb_msgtype(F1, [tpe | Path], TrUserData)
+    end,
+    if F2 == undefined -> ok;
+       true ->
+	   v_msg_ssb_address(F2, [address | Path], TrUserData)
+    end,
+    ok;
+v_msg_ssb_content(X, Path, _TrUserData) ->
+    mk_type_error({expected_msg, ssb_content}, X, Path).
+
+-compile({nowarn_unused_function,v_msg_ssb_msg/3}).
+-dialyzer({nowarn_function,v_msg_ssb_msg/3}).
+v_msg_ssb_msg(#ssb_msg{author = F1, content = F2}, Path,
 	      TrUserData) ->
     if F1 == undefined -> ok;
-       true -> v_enum_msgtype(F1, [tpe | Path], TrUserData)
+       true ->
+	   v_msg_ssb_identity(F1, [author | Path], TrUserData)
     end,
     if F2 == undefined -> ok;
-       true -> v_msg_address(F2, [address | Path], TrUserData)
+       true ->
+	   v_msg_ssb_content(F2, [content | Path], TrUserData)
     end,
     ok;
-v_msg_content(X, Path, _TrUserData) ->
-    mk_type_error({expected_msg, content}, X, Path).
+v_msg_ssb_msg(X, Path, _TrUserData) ->
+    mk_type_error({expected_msg, ssb_msg}, X, Path).
 
--compile({nowarn_unused_function,v_msg_msg/3}).
--dialyzer({nowarn_function,v_msg_msg/3}).
-v_msg_msg(#msg{author = F1, content = F2}, Path,
-	  TrUserData) ->
-    if F1 == undefined -> ok;
-       true -> v_msg_identity(F1, [author | Path], TrUserData)
-    end,
-    if F2 == undefined -> ok;
-       true -> v_msg_content(F2, [content | Path], TrUserData)
-    end,
-    ok;
-v_msg_msg(X, Path, _TrUserData) ->
-    mk_type_error({expected_msg, msg}, X, Path).
-
--compile({nowarn_unused_function,v_msg_invite/3}).
--dialyzer({nowarn_function,v_msg_invite/3}).
-v_msg_invite(#invite{keys = F1}, Path, TrUserData) ->
-    if F1 == undefined -> ok;
-       true -> v_msg_identity(F1, [keys | Path], TrUserData)
-    end,
-    ok;
-v_msg_invite(X, Path, _TrUserData) ->
-    mk_type_error({expected_msg, invite}, X, Path).
-
--compile({nowarn_unused_function,v_enum_keytype/3}).
--dialyzer({nowarn_function,v_enum_keytype/3}).
-v_enum_keytype(ed25519, _Path, _TrUserData) -> ok;
-v_enum_keytype(ed448, _Path, _TrUserData) -> ok;
-v_enum_keytype(V, Path, TrUserData)
+-compile({nowarn_unused_function,v_enum_ssb_keytype/3}).
+-dialyzer({nowarn_function,v_enum_ssb_keytype/3}).
+v_enum_ssb_keytype(ed25519, _Path, _TrUserData) -> ok;
+v_enum_ssb_keytype(ed448, _Path, _TrUserData) -> ok;
+v_enum_ssb_keytype(V, Path, TrUserData)
     when is_integer(V) ->
     v_type_sint32(V, Path, TrUserData);
-v_enum_keytype(X, Path, _TrUserData) ->
-    mk_type_error({invalid_enum, keytype}, X, Path).
+v_enum_ssb_keytype(X, Path, _TrUserData) ->
+    mk_type_error({invalid_enum, ssb_keytype}, X, Path).
 
--compile({nowarn_unused_function,v_enum_msgtype/3}).
--dialyzer({nowarn_function,v_enum_msgtype/3}).
-v_enum_msgtype(pub, _Path, _TrUserData) -> ok;
-v_enum_msgtype(invite, _Path, _TrUserData) -> ok;
-v_enum_msgtype(V, Path, TrUserData)
+-compile({nowarn_unused_function,v_enum_ssb_msgtype/3}).
+-dialyzer({nowarn_function,v_enum_ssb_msgtype/3}).
+v_enum_ssb_msgtype(pub, _Path, _TrUserData) -> ok;
+v_enum_ssb_msgtype(invite, _Path, _TrUserData) -> ok;
+v_enum_ssb_msgtype(V, Path, TrUserData)
     when is_integer(V) ->
     v_type_sint32(V, Path, TrUserData);
-v_enum_msgtype(X, Path, _TrUserData) ->
-    mk_type_error({invalid_enum, msgtype}, X, Path).
+v_enum_ssb_msgtype(X, Path, _TrUserData) ->
+    mk_type_error({invalid_enum, ssb_msgtype}, X, Path).
 
 -compile({nowarn_unused_function,v_type_sint32/3}).
 -dialyzer({nowarn_function,v_type_sint32/3}).
@@ -1486,11 +1388,12 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 'erlang_++'(A, B, _TrUserData) -> A ++ B.
 
 get_msg_defs() ->
-    [{{enum, keytype}, [{ed25519, 1}, {ed448, 2}]},
-     {{enum, msgtype}, [{pub, 1}, {invite, 2}]},
-     {{msg, identity},
+    [{{enum, ssb_keytype}, [{ed25519, 1}, {ed448, 2}]},
+     {{enum, ssb_hashtype}, [{sha256, 1}, {blake2b, 2}]},
+     {{enum, ssb_msgtype}, [{pub, 1}, {invite, 2}]},
+     {{msg, ssb_identity},
       [#field{name = tpe, fnum = 1, rnum = 2,
-	      type = {enum, keytype}, occurrence = optional,
+	      type = {enum, ssb_keytype}, occurrence = optional,
 	      opts = []},
        #field{name = secret_key, fnum = 2, rnum = 3,
 	      type = bytes, occurrence = optional, opts = []},
@@ -1498,46 +1401,43 @@ get_msg_defs() ->
 	      type = bytes, occurrence = optional, opts = []},
        #field{name = text, fnum = 4, rnum = 5, type = bytes,
 	      occurrence = optional, opts = []}]},
-     {{msg, address},
+     {{msg, ssb_address},
       [#field{name = host, fnum = 1, rnum = 2, type = bytes,
 	      occurrence = optional, opts = []},
        #field{name = port, fnum = 2, rnum = 3, type = int32,
 	      occurrence = optional, opts = []},
        #field{name = key, fnum = 3, rnum = 4,
-	      type = {msg, identity}, occurrence = optional,
+	      type = {msg, ssb_identity}, occurrence = optional,
 	      opts = []}]},
-     {{msg, content},
+     {{msg, ssb_content},
       [#field{name = tpe, fnum = 1, rnum = 2,
-	      type = {enum, msgtype}, occurrence = optional,
+	      type = {enum, ssb_msgtype}, occurrence = optional,
 	      opts = []},
        #field{name = address, fnum = 2, rnum = 3,
-	      type = {msg, address}, occurrence = optional,
+	      type = {msg, ssb_address}, occurrence = optional,
 	      opts = []}]},
-     {{msg, msg},
+     {{msg, ssb_msg},
       [#field{name = author, fnum = 1, rnum = 2,
-	      type = {msg, identity}, occurrence = optional,
+	      type = {msg, ssb_identity}, occurrence = optional,
 	      opts = []},
        #field{name = content, fnum = 2, rnum = 3,
-	      type = {msg, content}, occurrence = optional,
-	      opts = []}]},
-     {{msg, invite},
-      [#field{name = keys, fnum = 1, rnum = 2,
-	      type = {msg, identity}, occurrence = optional,
+	      type = {msg, ssb_content}, occurrence = optional,
 	      opts = []}]}].
 
 
 get_msg_names() ->
-    [identity, address, content, msg, invite].
+    [ssb_identity, ssb_address, ssb_content, ssb_msg].
 
 
 get_group_names() -> [].
 
 
 get_msg_or_group_names() ->
-    [identity, address, content, msg, invite].
+    [ssb_identity, ssb_address, ssb_content, ssb_msg].
 
 
-get_enum_names() -> [keytype, msgtype].
+get_enum_names() ->
+    [ssb_keytype, ssb_hashtype, ssb_msgtype].
 
 
 fetch_msg_def(MsgName) ->
@@ -1554,9 +1454,9 @@ fetch_enum_def(EnumName) ->
     end.
 
 
-find_msg_def(identity) ->
+find_msg_def(ssb_identity) ->
     [#field{name = tpe, fnum = 1, rnum = 2,
-	    type = {enum, keytype}, occurrence = optional,
+	    type = {enum, ssb_keytype}, occurrence = optional,
 	    opts = []},
      #field{name = secret_key, fnum = 2, rnum = 3,
 	    type = bytes, occurrence = optional, opts = []},
@@ -1564,65 +1464,75 @@ find_msg_def(identity) ->
 	    type = bytes, occurrence = optional, opts = []},
      #field{name = text, fnum = 4, rnum = 5, type = bytes,
 	    occurrence = optional, opts = []}];
-find_msg_def(address) ->
+find_msg_def(ssb_address) ->
     [#field{name = host, fnum = 1, rnum = 2, type = bytes,
 	    occurrence = optional, opts = []},
      #field{name = port, fnum = 2, rnum = 3, type = int32,
 	    occurrence = optional, opts = []},
      #field{name = key, fnum = 3, rnum = 4,
-	    type = {msg, identity}, occurrence = optional,
+	    type = {msg, ssb_identity}, occurrence = optional,
 	    opts = []}];
-find_msg_def(content) ->
+find_msg_def(ssb_content) ->
     [#field{name = tpe, fnum = 1, rnum = 2,
-	    type = {enum, msgtype}, occurrence = optional,
+	    type = {enum, ssb_msgtype}, occurrence = optional,
 	    opts = []},
      #field{name = address, fnum = 2, rnum = 3,
-	    type = {msg, address}, occurrence = optional,
+	    type = {msg, ssb_address}, occurrence = optional,
 	    opts = []}];
-find_msg_def(msg) ->
+find_msg_def(ssb_msg) ->
     [#field{name = author, fnum = 1, rnum = 2,
-	    type = {msg, identity}, occurrence = optional,
+	    type = {msg, ssb_identity}, occurrence = optional,
 	    opts = []},
      #field{name = content, fnum = 2, rnum = 3,
-	    type = {msg, content}, occurrence = optional,
-	    opts = []}];
-find_msg_def(invite) ->
-    [#field{name = keys, fnum = 1, rnum = 2,
-	    type = {msg, identity}, occurrence = optional,
+	    type = {msg, ssb_content}, occurrence = optional,
 	    opts = []}];
 find_msg_def(_) -> error.
 
 
-find_enum_def(keytype) -> [{ed25519, 1}, {ed448, 2}];
-find_enum_def(msgtype) -> [{pub, 1}, {invite, 2}];
+find_enum_def(ssb_keytype) ->
+    [{ed25519, 1}, {ed448, 2}];
+find_enum_def(ssb_hashtype) ->
+    [{sha256, 1}, {blake2b, 2}];
+find_enum_def(ssb_msgtype) -> [{pub, 1}, {invite, 2}];
 find_enum_def(_) -> error.
 
 
-enum_symbol_by_value(keytype, Value) ->
-    enum_symbol_by_value_keytype(Value);
-enum_symbol_by_value(msgtype, Value) ->
-    enum_symbol_by_value_msgtype(Value).
+enum_symbol_by_value(ssb_keytype, Value) ->
+    enum_symbol_by_value_ssb_keytype(Value);
+enum_symbol_by_value(ssb_hashtype, Value) ->
+    enum_symbol_by_value_ssb_hashtype(Value);
+enum_symbol_by_value(ssb_msgtype, Value) ->
+    enum_symbol_by_value_ssb_msgtype(Value).
 
 
-enum_value_by_symbol(keytype, Sym) ->
-    enum_value_by_symbol_keytype(Sym);
-enum_value_by_symbol(msgtype, Sym) ->
-    enum_value_by_symbol_msgtype(Sym).
+enum_value_by_symbol(ssb_keytype, Sym) ->
+    enum_value_by_symbol_ssb_keytype(Sym);
+enum_value_by_symbol(ssb_hashtype, Sym) ->
+    enum_value_by_symbol_ssb_hashtype(Sym);
+enum_value_by_symbol(ssb_msgtype, Sym) ->
+    enum_value_by_symbol_ssb_msgtype(Sym).
 
 
-enum_symbol_by_value_keytype(1) -> ed25519;
-enum_symbol_by_value_keytype(2) -> ed448.
+enum_symbol_by_value_ssb_keytype(1) -> ed25519;
+enum_symbol_by_value_ssb_keytype(2) -> ed448.
 
 
-enum_value_by_symbol_keytype(ed25519) -> 1;
-enum_value_by_symbol_keytype(ed448) -> 2.
+enum_value_by_symbol_ssb_keytype(ed25519) -> 1;
+enum_value_by_symbol_ssb_keytype(ed448) -> 2.
 
-enum_symbol_by_value_msgtype(1) -> pub;
-enum_symbol_by_value_msgtype(2) -> invite.
+enum_symbol_by_value_ssb_hashtype(1) -> sha256;
+enum_symbol_by_value_ssb_hashtype(2) -> blake2b.
 
 
-enum_value_by_symbol_msgtype(pub) -> 1;
-enum_value_by_symbol_msgtype(invite) -> 2.
+enum_value_by_symbol_ssb_hashtype(sha256) -> 1;
+enum_value_by_symbol_ssb_hashtype(blake2b) -> 2.
+
+enum_symbol_by_value_ssb_msgtype(1) -> pub;
+enum_symbol_by_value_ssb_msgtype(2) -> invite.
+
+
+enum_value_by_symbol_ssb_msgtype(pub) -> 1;
+enum_value_by_symbol_ssb_msgtype(invite) -> 2.
 
 
 get_service_names() -> [].
@@ -1673,30 +1583,30 @@ service_and_rpc_name_to_fqbins(S, R) ->
     error({gpb_error, {badservice_or_rpc, {S, R}}}).
 
 
-fqbin_to_msg_name(<<"ssb.identity">>) -> identity;
-fqbin_to_msg_name(<<"ssb.address">>) -> address;
-fqbin_to_msg_name(<<"ssb.content">>) -> content;
-fqbin_to_msg_name(<<"ssb.msg">>) -> msg;
-fqbin_to_msg_name(<<"ssb.invite">>) -> invite;
+fqbin_to_msg_name(<<"ssb.ssb_identity">>) -> ssb_identity;
+fqbin_to_msg_name(<<"ssb.ssb_address">>) -> ssb_address;
+fqbin_to_msg_name(<<"ssb.ssb_content">>) -> ssb_content;
+fqbin_to_msg_name(<<"ssb.ssb_msg">>) -> ssb_msg;
 fqbin_to_msg_name(E) -> error({gpb_error, {badmsg, E}}).
 
 
-msg_name_to_fqbin(identity) -> <<"ssb.identity">>;
-msg_name_to_fqbin(address) -> <<"ssb.address">>;
-msg_name_to_fqbin(content) -> <<"ssb.content">>;
-msg_name_to_fqbin(msg) -> <<"ssb.msg">>;
-msg_name_to_fqbin(invite) -> <<"ssb.invite">>;
+msg_name_to_fqbin(ssb_identity) -> <<"ssb.ssb_identity">>;
+msg_name_to_fqbin(ssb_address) -> <<"ssb.ssb_address">>;
+msg_name_to_fqbin(ssb_content) -> <<"ssb.ssb_content">>;
+msg_name_to_fqbin(ssb_msg) -> <<"ssb.ssb_msg">>;
 msg_name_to_fqbin(E) -> error({gpb_error, {badmsg, E}}).
 
 
-fqbin_to_enum_name(<<"ssb.keytype">>) -> keytype;
-fqbin_to_enum_name(<<"ssb.msgtype">>) -> msgtype;
+fqbin_to_enum_name(<<"ssb.ssb_keytype">>) -> ssb_keytype;
+fqbin_to_enum_name(<<"ssb.ssb_hashtype">>) -> ssb_hashtype;
+fqbin_to_enum_name(<<"ssb.ssb_msgtype">>) -> ssb_msgtype;
 fqbin_to_enum_name(E) ->
     error({gpb_error, {badenum, E}}).
 
 
-enum_name_to_fqbin(keytype) -> <<"ssb.keytype">>;
-enum_name_to_fqbin(msgtype) -> <<"ssb.msgtype">>;
+enum_name_to_fqbin(ssb_keytype) -> <<"ssb.ssb_keytype">>;
+enum_name_to_fqbin(ssb_hashtype) -> <<"ssb.ssb_hashtype">>;
+enum_name_to_fqbin(ssb_msgtype) -> <<"ssb.ssb_msgtype">>;
 enum_name_to_fqbin(E) ->
     error({gpb_error, {badenum, E}}).
 
@@ -1729,7 +1639,7 @@ get_all_proto_names() -> ["ssb"].
 
 
 get_msg_containment("ssb") ->
-    [address, content, identity, invite, msg];
+    [ssb_address, ssb_content, ssb_identity, ssb_msg];
 get_msg_containment(P) ->
     error({gpb_error, {badproto, P}}).
 
@@ -1749,16 +1659,16 @@ get_rpc_containment(P) ->
     error({gpb_error, {badproto, P}}).
 
 
-get_enum_containment("ssb") -> [keytype, msgtype];
+get_enum_containment("ssb") ->
+    [ssb_hashtype, ssb_keytype, ssb_msgtype];
 get_enum_containment(P) ->
     error({gpb_error, {badproto, P}}).
 
 
-get_proto_by_msg_name_as_fqbin(<<"ssb.address">>) -> "ssb";
-get_proto_by_msg_name_as_fqbin(<<"ssb.content">>) -> "ssb";
-get_proto_by_msg_name_as_fqbin(<<"ssb.invite">>) -> "ssb";
-get_proto_by_msg_name_as_fqbin(<<"ssb.msg">>) -> "ssb";
-get_proto_by_msg_name_as_fqbin(<<"ssb.identity">>) -> "ssb";
+get_proto_by_msg_name_as_fqbin(<<"ssb.ssb_address">>) -> "ssb";
+get_proto_by_msg_name_as_fqbin(<<"ssb.ssb_content">>) -> "ssb";
+get_proto_by_msg_name_as_fqbin(<<"ssb.ssb_msg">>) -> "ssb";
+get_proto_by_msg_name_as_fqbin(<<"ssb.ssb_identity">>) -> "ssb";
 get_proto_by_msg_name_as_fqbin(E) ->
     error({gpb_error, {badmsg, E}}).
 
@@ -1768,8 +1678,9 @@ get_proto_by_service_name_as_fqbin(E) ->
     error({gpb_error, {badservice, E}}).
 
 
-get_proto_by_enum_name_as_fqbin(<<"ssb.msgtype">>) -> "ssb";
-get_proto_by_enum_name_as_fqbin(<<"ssb.keytype">>) -> "ssb";
+get_proto_by_enum_name_as_fqbin(<<"ssb.ssb_msgtype">>) -> "ssb";
+get_proto_by_enum_name_as_fqbin(<<"ssb.ssb_keytype">>) -> "ssb";
+get_proto_by_enum_name_as_fqbin(<<"ssb.ssb_hashtype">>) -> "ssb";
 get_proto_by_enum_name_as_fqbin(E) ->
     error({gpb_error, {badenum, E}}).
 

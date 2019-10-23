@@ -1,39 +1,40 @@
 syntax = "proto3";
 package ssb;
 
-enum keytype {
-  ed25519                = 1;
-  ed448                  = 2;
+enum ssb_keytype {
+  ed25519                     = 1;
+  ed448                       = 2;
 }
 
-enum msgtype {
-  pub                    = 1;
-  invite                 = 2;
+enum ssb_hashtype {
+  sha256                      = 1;
+  blake2b                     = 2;
 }
 
-message identity {
-  keytype     tpe        = 1;
-  bytes       secret_key = 2; // optional
-  bytes       public_key = 3;
-  bytes       text       = 4; // human-readable identity
+enum ssb_msgtype {
+  pub                         = 1;
+  invite                      = 2;
 }
 
-message address {
-  bytes       host       = 1;
-  int32       port       = 2;
-  identity    key        = 3;
+message ssb_identity {
+  ssb_keytype     tpe         = 1;
+  bytes           secret_key  = 2; // optional
+  bytes           public_key  = 3;
+  bytes           text        = 4; // human-readable identity
 }
 
-message content {
-  msgtype     tpe         = 1;
-  address     address     = 2;
+message ssb_address {
+  bytes           host        = 1;
+  int32           port        = 2;
+  ssb_identity    key         = 3;
 }
 
-message msg {
-  identity    author     = 1;
-  content     content    = 2;
+message ssb_content {
+  ssb_msgtype     tpe         = 1;
+  ssb_address     address     = 2;
 }
 
-message invite {
-  identity    keys       = 1;
+message ssb_msg {
+  ssb_identity    author      = 1;
+  ssb_content     content     = 2;
 }
