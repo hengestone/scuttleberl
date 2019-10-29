@@ -16,7 +16,7 @@
 -module(identity_utils).
 -include("ssb.hrl").
 
--export([create_identity/1]).
+-export([create_identity/1, store_identity/1]).
 
 -spec create_identity(atom()) -> #ssb_identity{}.
 create_identity(Type = ed25519) ->
@@ -28,3 +28,8 @@ create_identity(Type = ed25519) ->
        public_key = PublicKey,
        text       = binary:list_to_bin(io_lib:format("@~s.~s",[base64:encode(PublicKey), Type]))
       }.
+
+store_identity(#ssb_identity{secret_key=SK} = Id) when is_binary(SK) ->
+  mnesia:transaction(fun () ->
+    mnesia:write(ssb_identity, Id, write)
+  end).
