@@ -35,6 +35,11 @@ store(#ssb_identity{secret_key=SK} = Id) when is_binary(SK) ->
     {atomic, ok} = mnesia:transaction(fun () ->
                                               mnesia:write(ssb_identity, Id, write)
                                       end),
+    {ok, atomic};
+store(#ssb_invite{secret_key=SK} = Invite) when is_binary(SK) ->
+    {atomic, ok} = mnesia:transaction(fun () ->
+                                              mnesia:write(ssb_invite, Invite, write)
+                                      end),
     {ok, atomic}.
 
 -spec invite(#ssb_identity{}, integer()) -> #ssb_invite{}.
