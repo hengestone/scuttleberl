@@ -11,9 +11,10 @@
 -define('SSB_IDENTITY_PB_H', true).
 -record(ssb_identity,
         {tpe = ed25519          :: 'ed25519' | 'ed448' | integer() | undefined, % = 1, enum ssb_keytype
-         secret_key = <<>>      :: iodata() | undefined, % = 2
-         public_key = <<>>      :: iodata() | undefined, % = 3
-         text = <<>>            :: iodata() | undefined % = 4
+         purpose = pub          :: 'pub' | 'client' | 'invite' | 'handshake' | integer() | undefined, % = 2, enum ssb_keypurpose
+         secret_key = <<>>      :: iodata() | undefined, % = 3
+         public_key = <<>>      :: iodata() | undefined, % = 4
+         text = <<>>            :: iodata() | undefined % = 5
         }).
 -endif.
 
@@ -22,7 +23,7 @@
 -record(ssb_address,
         {host = <<>>            :: iodata() | undefined, % = 1
          port = 0               :: integer() | undefined, % = 2, 32 bits
-         key = undefined        :: ssb:ssb_identity() | undefined % = 3
+         id = undefined         :: ssb:ssb_identity() | undefined % = 3
         }).
 -endif.
 
@@ -39,6 +40,18 @@
 -record(ssb_msg,
         {author = undefined     :: ssb:ssb_identity() | undefined, % = 1
          content = undefined    :: ssb:ssb_content() | undefined % = 2
+        }).
+-endif.
+
+-ifndef('SSB_INVITE_PB_H').
+-define('SSB_INVITE_PB_H', true).
+-record(ssb_invite,
+        {pub_text = <<>>        :: iodata() | undefined, % = 1
+         secret_key = <<>>      :: iodata() | undefined, % = 2
+         public_key = <<>>      :: iodata() | undefined, % = 3
+         text = <<>>            :: iodata() | undefined, % = 4
+         max_uses = 0           :: non_neg_integer() | undefined, % = 5, 32 bits
+         num_uses = 0           :: non_neg_integer() | undefined % = 6, 32 bits
         }).
 -endif.
 

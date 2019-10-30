@@ -16,20 +16,38 @@
 -module(identity_utils).
 -include("ssb.hrl").
 
--export([create_identity/1, store_identity/1]).
+-export([create/2, store/1, invite/2, key_text/2]).
 
--spec create_identity(atom()) -> #ssb_identity{}.
-create_identity(Type = ed25519) ->
+-spec create(atom(), atom()) -> #ssb_identity{}.
+create(Type = ed25519, Purpose) ->
     #{ public := PublicKey, secret := PrivKeyOut } = enacl:crypto_sign_ed25519_keypair(),
 
     #ssb_identity{
-       tpe = Type,
+       tpe        = Type,
+       purpose    = Purpose,
        secret_key = PrivKeyOut,
        public_key = PublicKey,
-       text       = binary:list_to_bin(io_lib:format("@~s.~s",[base64:encode(PublicKey), Type]))
+       text       = key_text(PublicKey, Type)
       }.
 
-store_identity(#ssb_identity{secret_key=SK} = Id) when is_binary(SK) ->
-  mnesia:transaction(fun () ->
-    mnesia:write(ssb_identity, Id, write)
-  end).
+-spec store(#ssb_identity{}) -> {ok, atomic} | {error, any()}.
+store(#ssb_identity{secret_key=SK} = Id) when is_binary(SK) ->
+    {atomic, ok} = mnesia:transaction(fun () ->
+                                              mnesia:write(ssb_identity, Id, write)
+                                      end),
+    {ok, atomic}.
+
+-spec invite(#ssb_identity{}, integer()) -> #ssb_invite{}.
+invite(#ssb_identity{secret_key=_SK, public_key=_PK} = PubId, MaxUse) when is_integer(MaxUse) andalso MaxUse > 0 ->
+    InviteId = create(PubId#ssb_identity.tpe, invite),
+    #ssb_invite{
+       pub_text   = PubId#ssb_identity.text,
+       public_key = InviteId#ssb_identity.public_key,
+       secret_key = InviteId#ssb_identity.secret_key,
+       text       = key_text(InviteId#ssb_identity.secret_key, PubId#ssb_identity.tpe),
+       max_uses   = MaxUse,
+       num_uses   = 0
+      }.
+
+key_text(Key, Type) ->
+  binary:list_to_bin(io_lib:format("@~s.~s",[base64:encode(Key), Type])).

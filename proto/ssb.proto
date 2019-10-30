@@ -6,6 +6,13 @@ enum ssb_keytype {
   ed448                       = 2;
 }
 
+enum ssb_keypurpose {
+  pub                         = 1;
+  client                      = 2;
+  invite                      = 3;
+  handshake                   = 4;
+}
+
 enum ssb_hashtype {
   sha256                      = 1;
   blake2b                     = 2;
@@ -18,15 +25,16 @@ enum ssb_msgtype {
 
 message ssb_identity {
   ssb_keytype     tpe         = 1;
-  bytes           secret_key  = 2; // optional
-  bytes           public_key  = 3;
-  bytes           text        = 4; // human-readable identity
+  ssb_keypurpose  purpose     = 2;
+  bytes           secret_key  = 3; // optional
+  bytes           public_key  = 4;
+  bytes           text        = 5; // human-readable identity
 }
 
 message ssb_address {
   bytes           host        = 1;
   int32           port        = 2;
-  ssb_identity    key         = 3;
+  ssb_identity    id          = 3;
 }
 
 message ssb_content {
@@ -37,4 +45,13 @@ message ssb_content {
 message ssb_msg {
   ssb_identity    author      = 1;
   ssb_content     content     = 2;
+}
+
+message ssb_invite {
+  bytes           pub_text    = 1;
+  bytes           secret_key  = 2;
+  bytes           public_key  = 3;
+  bytes           text        = 4; // human-readable identity/secret key
+  uint32          max_uses    = 5;
+  uint32          num_uses    = 6;
 }
