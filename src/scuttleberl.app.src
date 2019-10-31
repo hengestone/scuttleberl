@@ -1,28 +1,28 @@
 {application, scuttleberl,
- [{description, "scuttleberl managed by Nova"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {mod, { scuttleberl_app, []}},
-  {included_applications, [
-                           nova
-                          ]},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[
-        {dev_mode, true},
+    [{description, "scuttleberl managed by Nova"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, { scuttleberl_app, []}},
+    {included_applications, [
+        nova
+    ]},
+    {applications,
+        [kernel,
+        stdlib
+        ]},
+    {env,[
+        {dev_mode, false},
         {web_port, 8080},
         {nova_applications, [
-                               #{
-                                 name => scuttleberl,
-                                 routes_file => "priv/scuttleberl.routes.erl"
-                                }
-                              ]}
+#{
+    name => scuttleberl,
+    routes_file => "priv/scuttleberl.routes.erl"
+}
+        ]}
 
-       ]},
-  {modules, []},
-  {maintainers, []},
-  {licenses, ["Apache 2.0"]},
-  {links, []}
- ]}.
+    ]},
+{modules, []},
+{maintainers, []},
+{licenses, ["Apache 2.0"]},
+{links, []}
+]}.

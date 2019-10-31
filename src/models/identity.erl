@@ -13,7 +13,7 @@
 %% You should have received a copy of the GNU Affero General Public License
 %% along with this program.  If not, see <http://www.gnu.org/licenses/>.%%
 
--module(identity_utils).
+-module(identity).
 -include("ssb.hrl").
 
 -export([create/2, store/1, invite/2, key_text/2]).

@@ -14,13 +14,13 @@
 %% along with this program.  If not, see <http://www.gnu.org/licenses/>.%%
 
 -module(scuttleberl_db).
--export([init/0]).
+-export([init/0, create_tables/1]).
 -include("ssb.hrl").
 
 init() ->
     Nodes = [node()],
     ok = mnesia:start(),
-    ok = case mnesia:create_schema(Nodes) of
+    case mnesia:create_schema(Nodes) of
         {error, {_, {already_exists, _}}} ->
             create_tables(Nodes);
         {error, _Err} ->

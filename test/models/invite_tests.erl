@@ -13,17 +13,10 @@
 %% You should have received a copy of the GNU Affero General Public License
 %% along with this program.  If not, see <http://www.gnu.org/licenses/>.%%
 
--module(identity_utils_tests).
+-module(invite_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include("ssb.hrl").
 
-create_identity_test() ->
-    #ssb_identity{} = identity_utils:create(ed25519, pub).
-
 create_invite_test() ->
-  Id = identity_utils:create(ed25519, pub),
-  #ssb_invite{} = identity_utils:invite(Id, 1).
-
-key_text_test() ->
-  Id = identity_utils:create(ed25519, client),
-  is_binary(identity_utils:key_text(Id#ssb_identity.secret_key, ed25519)).
+    Id = identity:create(ed25519, pub),
+    #ssb_invite{} = invite:create(Id, 1).
