@@ -17,7 +17,13 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("ssb.hrl").
 
--export([create_identity_test/0]).
-
 create_identity_test() ->
-    #ssb_identity{} = identity_utils:create_identity(ed25519).
+    #ssb_identity{} = identity_utils:create(ed25519, pub).
+
+create_invite_test() ->
+  Id = identity_utils:create(ed25519, pub),
+  #ssb_invite{} = identity_utils:invite(Id, 1).
+
+key_text_test() ->
+  Id = identity_utils:create(ed25519, client),
+  is_binary(identity_utils:key_text(Id#ssb_identity.secret_key, ed25519)).
